@@ -1,0 +1,2469 @@
+<!-- Landbox map maker standalone v1. Offline single file. Original procedural art. No network. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data: blob:; connect-src 'none'; font-src 'none'; media-src 'none'">
+<title>Landbox map maker</title>
+<style>
+  :root {
+    --bg: #14110e;
+    --surface: #221c16;
+    --ink: #f3eadb;
+    --muted: #b3a48e;
+    --line: #3c3228;
+    --accent: #e0b15a;
+    --chip: #2a241c;
+    --mock-rest: rgba(42, 36, 28, 0.3);
+    --mock-solid: #2a241c;
+    --tap: 44px;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; height: 100%; background: var(--bg); color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 14px; overflow: hidden;
+  }
+  button, input { font: inherit; color: inherit; }
+  button {
+    min-height: var(--tap); min-width: var(--tap);
+    background: var(--chip); border: 1px solid #4a3d30; border-radius: 10px;
+    padding: 6px 10px; cursor: pointer;
+  }
+  button:focus-visible, a:focus-visible, input:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px;
+  }
+  button[aria-pressed="true"] { border-color: var(--accent); background: #3a3124; }
+  #app {
+    height: 100%; height: 100dvh; display: flex; flex-direction: column;
+    padding-bottom: 86px; overflow: hidden;
+  }
+  #workspace, #side { display: contents; }
+  #header {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    padding: 6px 10px 2px; background: #1a1612; order: 1;
+  }
+  .brand {
+    font-family: Palatino, Georgia, "Times New Roman", serif;
+    font-size: 20px; line-height: 1; padding: 8px 0;
+  }
+  .seedlab { display: flex; align-items: center; gap: 6px; color: var(--muted); }
+  #seed, #sea-num, #label-text {
+    min-height: var(--tap); background: #14110e; border: 1px solid #4a3d30;
+    border-radius: 8px; padding: 4px 8px; max-width: 100%;
+  }
+  #seed { width: 92px; }
+  #back {
+    margin-left: auto; min-height: var(--tap); display: inline-flex; align-items: center;
+    padding: 0 8px; color: var(--accent); text-decoration: none; font-weight: 600;
+  }
+  #hint, #geo {
+    flex-basis: 100%; margin: 0; color: var(--muted); font-size: 12px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  #geo { color: #d7c4a3; }
+  #stage { order: 2; flex: 1 1 auto; min-height: 80px; position: relative; background: #16323f; touch-action: none; }
+  #view { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; cursor: crosshair; }
+  #context {
+    order: 3; display: flex; gap: 6px; align-items: center; overflow-x: auto;
+    padding: 6px 8px; min-height: 56px; background: #1c1814; border-top: 1px solid var(--line);
+  }
+  #hotbar {
+    order: 4; display: flex; flex-wrap: wrap; gap: 3px; overflow-x: auto; padding: 4px 6px;
+    background: #1a1612; border-top: 1px solid var(--line); max-width: 100%;
+  }
+  .slot {
+    flex: 0 0 44px; width: 44px; min-width: 44px; height: 48px; padding: 2px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  }
+  .slot .k { font-size: 11px; color: var(--accent); line-height: 1; font-weight: 700; }
+  .slot .a { font-size: 8px; line-height: 1.05; max-width: 42px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--ink); }
+  #dock { order: 5; background: #1a1612; border-top: 1px solid var(--line); padding: 6px 8px 8px; }
+  .dock-btns, #context { max-width: 100%; }
+  .dock-btns { display: flex; gap: 6px; overflow-x: auto; }
+  .dock-sea { display: flex; align-items: center; gap: 8px; min-height: var(--tap); }
+  .dock-sea label { color: var(--muted); min-width: 28px; }
+  #sea { flex: 1; min-height: var(--tap); accent-color: var(--accent); }
+  #sea-num { width: 76px; }
+  .swatch, .stamp-btn, .style-btn, .ink-btn, .sculpt-btn {
+    flex: 0 0 auto; width: var(--tap); height: var(--tap); padding: 3px; border-radius: 10px;
+  }
+  .swatch { border: 2px solid #1a1612; }
+  .swatch[aria-pressed="true"], .stamp-btn[aria-pressed="true"], .style-btn[aria-pressed="true"], .ink-btn[aria-pressed="true"], .sculpt-btn[aria-pressed="true"] {
+    border-color: var(--accent);
+  }
+  .stamp-btn canvas { width: 32px; height: 32px; display: block; margin: 0 auto; }
+  .field { display: flex; align-items: center; gap: 6px; color: var(--muted); white-space: nowrap; }
+  .field input[type="range"] { width: 110px; min-height: var(--tap); accent-color: var(--accent); }
+  #label-text { width: 140px; }
+  #sheet {
+    position: fixed; left: 0; right: 0; bottom: 86px; z-index: 30;
+    max-height: min(72dvh, 560px); background: var(--surface);
+    border-top: 1px solid #4a3d30; border-radius: 16px 16px 0 0;
+    display: flex; flex-direction: column; padding: 8px 10px 12px;
+    box-shadow: 0 -8px 30px rgba(0,0,0,0.35);
+  }
+  #sheet[hidden] { display: none; }
+  #sheet header { display: flex; align-items: center; gap: 8px; }
+  #sheet h2 { font-size: 16px; margin: 0; font-family: Palatino, Georgia, serif; flex: 1; }
+  #sheet .body { overflow: auto; padding-top: 4px; }
+  .toggle {
+    width: 100%; display: flex; justify-content: space-between; align-items: center;
+    text-align: left; margin: 4px 0; min-height: 48px; gap: 10px;
+  }
+  .toggle b { display: block; font-weight: 650; }
+  .toggle small { display: block; color: var(--muted); font-size: 12px; }
+  .knob {
+    width: 42px; height: 26px; border-radius: 99px; background: #3a322a;
+    border: 1px solid #6a5a48; position: relative; flex: none;
+  }
+  .toggle[aria-checked="true"] .knob { background: var(--accent); border-color: #f0d7a0; }
+  .knob::after {
+    content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px;
+    border-radius: 50%; background: #f3eadb;
+  }
+  .toggle[aria-checked="true"] .knob::after { left: 19px; }
+  .assign {
+    width: 100%; text-align: left; margin: 3px 0; min-height: var(--tap);
+  }
+  .assign[aria-pressed="true"] { border-color: var(--accent); }
+  #toast {
+    position: fixed; left: 50%; bottom: 100px; transform: translateX(-50%);
+    background: #3a3124; color: var(--ink); border: 1px solid var(--accent);
+    border-radius: 999px; padding: 8px 14px; z-index: 40; max-width: calc(100% - 24px);
+  }
+  #toast[hidden] { display: none; }
+  #boot-error {
+    position: fixed; inset: 12px auto auto 12px; right: 12px; z-index: 50;
+    background: #3a1814; color: #ffd8d0; border: 1px solid #c4543a; border-radius: 10px; padding: 10px;
+  }
+  #boot-error[hidden] { display: none; }
+  /* Mock bar v2.2 — background alpha only; icons, label, and swatch dots stay opaque. */
+  #mock-bar {
+    position: fixed; left: 8px; bottom: 8px; z-index: 80;
+    display: flex; flex-direction: column; align-items: flex-start; gap: 4px;
+    max-width: calc(100vw - 16px);
+  }
+  .mock-version {
+    margin: 0; font-size: 11px; line-height: 1.2; color: #f3eadb; opacity: 1;
+    text-shadow: 0 1px 2px rgba(0,0,0,.65);
+  }
+  .mock-row { display: flex; gap: 4px; align-items: center; position: relative; }
+  .mock-chip, .mock-swatch {
+    opacity: 1; color: #f3eadb; background: var(--mock-rest);
+    border: 1px solid rgba(243, 234, 219, 0.55); border-radius: 10px;
+    min-height: var(--tap); min-width: var(--tap); padding: 0 10px;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .mock-chip:hover, .mock-chip:focus, .mock-chip:active,
+  .mock-swatch:hover, .mock-swatch:focus, .mock-swatch:active,
+  .mock-chip[aria-pressed="true"], .mock-swatch[aria-pressed="true"],
+  .mock-chip[aria-expanded="true"] { background: var(--mock-solid); }
+  .mock-swatch i { width: 16px; height: 16px; border-radius: 50%; display: block; opacity: 1; }
+  .mock-swatch[data-color="y"] i { background: #e2b100; }
+  .mock-swatch[data-color="g"] i { background: #2f9e44; }
+  .mock-swatch[data-color="r"] i { background: #e03131; }
+  #mock-dev-panel {
+    position: absolute; bottom: calc(100% + 4px); left: 0;
+    display: flex; flex-direction: column; gap: 4px;
+  }
+  #mock-dev-panel[hidden] { display: none; }
+  #mark-layer { position: fixed; inset: 0; z-index: 70; pointer-events: none; }
+  #mark-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .mark-num {
+    position: absolute; transform: translate(-50%, -50%);
+    min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px;
+    background: #14110e; color: #f3eadb; font-size: 11px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; opacity: 1;
+    border: 1px solid currentColor; pointer-events: none;
+  }
+  #mark-layer.numbers-off .mark-num { visibility: hidden; }
+  #mark-layer.marks-off #mark-canvas, #mark-layer.marks-off .mark-num { visibility: hidden; }
+  body.mock-guides button, body.mock-guides a, body.mock-guides input, body.mock-guides .slot {
+    outline: 1px dashed #e0b15a !important; outline-offset: 1px;
+  }
+  @media (min-width: 900px) {
+    .slot { flex-basis: 72px; width: 72px; height: 52px; }
+    .slot .a { font-size: 11px; max-width: 68px; }
+    #hotbar { gap: 6px; padding: 6px 8px; }
+  }
+  @media (orientation: landscape) and (max-height: 560px) {
+    #app { padding-bottom: 64px; }
+    #workspace { display: flex; order: 2; flex: 1 1 auto; width: 100%; min-height: 0; }
+    #side { display: flex; flex-direction: column; width: min(42vw, 240px); min-height: 0; overflow: auto; }
+    #stage { flex: 1 1 auto; min-width: 0; order: 0; }
+    #context, #dock { order: 0; }
+    #header, #hotbar { width: 100%; }
+    #sheet { bottom: 64px; }
+    .brand { font-size: 16px; padding: 4px 0; }
+  }
+</style>
+</head>
+<body>
+<main id="app">
+  <header id="header">
+    <div class="brand">Landbox</div>
+    <label class="seedlab">Seed <input id="seed" inputmode="numeric" autocomplete="off" aria-label="Map seed" value="20261110"></label>
+    <a id="back" href="landbox-mapmaker-globe-v1.html">Back to globe</a>
+    <p id="geo" hidden></p>
+    <p id="hint">Paint terrain. Right-click raises land. Shift, Ctrl, or Alt with right-click lowers it.</p>
+  </header>
+  <div id="workspace">
+    <div id="stage"><canvas id="view" aria-label="Fantasy map"></canvas></div>
+    <div id="side">
+      <div id="context"></div>
+      <div id="dock">
+        <div class="dock-btns">
+          <button type="button" id="regen">New map</button>
+          <button type="button" id="features-btn">Features</button>
+          <button type="button" id="layers-btn">Layers</button>
+          <button type="button" id="undo-btn">Undo</button>
+          <button type="button" id="redo-btn">Redo</button>
+          <button type="button" id="export-btn">Export</button>
+          <button type="button" id="rebind" aria-pressed="false">Rebind</button>
+        </div>
+        <div class="dock-sea">
+          <label for="sea">Sea</label>
+          <input id="sea" type="range" min="0.15" max="0.75" step="0.005" value="0.42" aria-valuemin="0.15" aria-valuemax="0.75">
+          <input id="sea-num" type="number" min="0.15" max="0.75" step="0.005" value="0.42" aria-label="Sea level value">
+        </div>
+      </div>
+    </div>
+  </div>
+  <div id="hotbar" aria-label="Hotbar"></div>
+</main>
+<div id="sheet" hidden>
+  <header>
+    <h2 id="sheet-title">Features</h2>
+    <button type="button" id="sheet-close">Close</button>
+  </header>
+  <div class="body" id="sheet-body"></div>
+</div>
+<div id="toast" hidden role="status"></div>
+<div id="boot-error" hidden></div>
+<div id="mock-bar" role="region" aria-label="Mock bar v2.2" data-version="Mock bar v2.2">
+  <p class="mock-version">Mock bar v2.2</p>
+  <div class="mock-row">
+    <button type="button" class="mock-swatch" data-color="y" aria-label="Yellow mark" aria-pressed="false"><i></i></button>
+    <button type="button" class="mock-swatch" data-color="g" aria-label="Green mark" aria-pressed="false"><i></i></button>
+    <button type="button" class="mock-swatch" data-color="r" aria-label="Red mark" aria-pressed="false"><i></i></button>
+    <button type="button" class="mock-chip" id="mock-numbers" aria-pressed="true" aria-label="Numbering">#</button>
+    <button type="button" class="mock-chip" id="mock-dev" aria-expanded="false" aria-label="Dev toggles">Dev</button>
+    <div id="mock-dev-panel" hidden>
+      <button type="button" class="mock-chip" id="mock-guides" aria-pressed="false">Guides</button>
+      <button type="button" class="mock-chip" id="mock-marks" aria-pressed="true">Marks</button>
+    </div>
+  </div>
+</div>
+<div id="mark-layer" aria-hidden="true"><canvas id="mark-canvas"></canvas></div>
+<script>
+(function () {
+  'use strict';
+  const W = 512, H = 320;
+  const TERRAIN = {
+    grass:    { name: 'Grass',    color: '#6f8f45' },
+    forest:   { name: 'Forest',   color: '#2c5a38' },
+    desert:   { name: 'Desert',   color: '#d7b483' },
+    snow:     { name: 'Snow',     color: '#e7eef0' },
+    swamp:    { name: 'Swamp',    color: '#5a6840' },
+    farmland: { name: 'Farmland', color: '#c2b15a' },
+    rock:     { name: 'Rock',     color: '#8a8178' },
+    water:    { name: 'Water',    color: '#3e738c' }
+  };
+  const STAMP_TYPES = ['castle', 'town', 'village', 'mountain', 'hill', 'trees', 'tower'];
+  const INKS = ['#241910', '#f4efe4', '#8f2d2d', '#1e4d8c', '#1f6b3a'];
+  const REGION_COLORS = ['#9c3b3b', '#2f5f8a', '#c4a15a', '#3f6b45', '#6b4c7a'];
+  const FEATURE_LIST = [
+    { id: 'layers', name: 'Layers', detail: 'Hide terrain, water, stamps, labels, and the rest. Modeled on Inkarnate.' },
+    { id: 'scatter', name: 'Symbol scatter brush', detail: 'Drop trees and hills along a stroke. Inkarnate and Wonderdraft.' },
+    { id: 'ripples', name: 'Coastline ripple lines', detail: 'Extra waterlines off the shore.' },
+    { id: 'frame', name: 'Map frame', detail: 'Double-line border with corner marks.' },
+    { id: 'compass', name: 'Compass rose', detail: 'North rose, drawn for this demo.' },
+    { id: 'scale', name: 'Scale bar', detail: 'League scale that follows zoom.' },
+    { id: 'parchment', name: 'Parchment overlay', detail: 'Warm paper grain over the paint.' },
+    { id: 'regions', name: 'Political region coloring', detail: 'Translucent realm colors. Azgaar-style.' },
+    { id: 'grid', name: 'Square grid', detail: 'Straight grid. Dungeondraft-style.' },
+    { id: 'hex', name: 'Hex overlay', detail: 'Hex grid. Worldographer and Dungeondraft.' },
+    { id: 'undo', name: 'Undo / redo', detail: 'Twenty steps. Off until you turn it on.' },
+    { id: 'exportPng', name: 'Export PNG', detail: 'Download the map as a PNG.' }
+  ];
+  const LAYER_LIST = [
+    ['terrain', 'Terrain paint'],
+    ['hillshade', 'Hillshade'],
+    ['water', 'Sea and coast'],
+    ['regions', 'Political colors'],
+    ['rivers', 'Rivers'],
+    ['roads', 'Roads'],
+    ['borders', 'Borders'],
+    ['stamps', 'Stamps'],
+    ['labels', 'Labels'],
+    ['overlays', 'Grid, frame, compass, scale, parchment']
+  ];
+  const ACTIONS = [
+    ['paint', 'Paint'], ['stamp', 'Stamp'], ['raise', 'Raise'], ['lower', 'Lower'],
+    ['river', 'River'], ['label', 'Label'], ['border', 'Border'], ['road', 'Road'],
+    ['region', 'Region'], ['scatter', 'Scatter'], ['pan', 'Pan'],
+    ['zoomIn', 'Zoom in'], ['zoomOut', 'Zoom out'],
+    ['panLeft', 'Pan west'], ['panRight', 'Pan east'], ['panUp', 'Pan north'], ['panDown', 'Pan south'],
+    ['undo', 'Undo'], ['redo', 'Redo'], ['generate', 'New map'], ['export', 'Export'],
+    ['rotate', 'Rotate'], ['brushUp', 'Bigger brush'], ['brushDown', 'Smaller brush'],
+    ['features', 'Features'], ['seaUp', 'Sea up'], ['seaDown', 'Sea down']
+  ];
+  const ACTION_NAME = Object.fromEntries(ACTIONS);
+  const PAN = { panLeft: [-1, 0], panRight: [1, 0], panUp: [0, -1], panDown: [0, 1] };
+  const CONTINUOUS = new Set(['zoomIn', 'zoomOut', 'brushUp', 'brushDown', 'seaUp', 'seaDown', 'panLeft', 'panRight', 'panUp', 'panDown']);
+  const HINTS = {
+    paint: 'Paint terrain. Right-click raises land. Shift, Ctrl, or Alt with right-click lowers it.',
+    stamp: 'Tap to place a stamp. Drag a stamp to move it. Delete removes the selected one.',
+    raise: 'Drag to raise land. The Raise / Lower switch is the phone control. Right-click also raises.',
+    lower: 'Drag to lower land. Modified right-click lowers too.',
+    river: 'Tap to drop points. The line tapers toward the end. Done commits it.',
+    label: 'Tap to place a name. Drag a name to move it. Rename it in the field.',
+    border: 'Tap points for a border. Solid, dashed, or dotted.',
+    road: 'Tap points for a road. Solid, dashed, or dotted.',
+    region: 'Paint a realm. Turn on Political region coloring to see it.',
+    scatter: 'Drag to drop trees and hills. Turn on Symbol scatter brush first.',
+    pan: 'Drag the map. W A S D pan as well.'
+  };
+
+  const stage = document.getElementById('stage');
+  const view = document.getElementById('view');
+  const vctx = view.getContext('2d');
+  const contextEl = document.getElementById('context');
+  const hotbarEl = document.getElementById('hotbar');
+  const sheet = document.getElementById('sheet');
+  const sheetTitle = document.getElementById('sheet-title');
+  const sheetBody = document.getElementById('sheet-body');
+  const seedInput = document.getElementById('seed');
+  const seaInput = document.getElementById('sea');
+  const seaNum = document.getElementById('sea-num');
+  const hintEl = document.getElementById('hint');
+  const geoEl = document.getElementById('geo');
+  const backLink = document.getElementById('back');
+
+  function makeCanvas(w, h) {
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    return c;
+  }
+  const terrainC = makeCanvas(W, H);
+  const shadeC = makeCanvas(W, H);
+  const waterC = makeCanvas(W, H);
+  const regionC = makeCanvas(W, H);
+  const paperC = makeCanvas(W, H);
+  const tctx = terrainC.getContext('2d', { willReadFrequently: true });
+  const sctx = shadeC.getContext('2d', { willReadFrequently: true });
+  const wctx = waterC.getContext('2d', { willReadFrequently: true });
+  const rctx = regionC.getContext('2d', { willReadFrequently: true });
+
+  let height = new Float32Array(W * H);
+  let sea = 0.42;
+  let seed = 20261110;
+  let lat = null, lon = null;
+  let brush = 22;
+  let tool = 'paint';
+  let terrainName = 'grass';
+  let stampType = 'castle';
+  let stampRot = 0;
+  let ink = INKS[0];
+  let sculptMode = 'raise';
+  let lineStyle = 'solid';
+  let riverW = 8;
+  let regionColor = REGION_COLORS[0];
+  let scatterKind = 'mixed';
+  let rebindMode = false;
+  let pendingSlot = null;
+  let sheetKind = null;
+  const stamps = [];
+  const rivers = [];
+  const roads = [];
+  const borders = [];
+  const labels = [];
+  let draft = { kind: null, points: [] };
+  let selection = null;
+  let nextId = 1;
+  let coastLines = [];
+  let didFit = false;
+  let dirty = true;
+  let drawCount = 0;
+  let genStats = { snow: 0, water: 0, land: 0 };
+  const cam = { cx: W / 2, cy: H / 2, zoom: 1 };
+  const features = {};
+  FEATURE_LIST.forEach(function (f) { features[f.id] = false; });
+  const layers = {};
+  LAYER_LIST.forEach(function (l) { layers[l[0]] = true; });
+  const slots = [
+    { key: '1', action: 'paint' }, { key: '2', action: 'stamp' }, { key: '3', action: 'raise' },
+    { key: '4', action: 'river' }, { key: '5', action: 'label' }, { key: '6', action: 'border' },
+    { key: '7', action: 'road' }, { key: '8', action: 'region' }, { key: '9', action: 'scatter' },
+    { key: 'q', action: 'zoomOut' }, { key: 'w', action: 'panUp' }, { key: 'e', action: 'zoomIn' },
+    { key: 'a', action: 'panLeft' }, { key: 's', action: 'panDown' }, { key: 'd', action: 'panRight' }
+  ];
+  const undoStack = [];
+  const redoStack = [];
+  const held = new Set();
+  let lastExport = null;
+
+  function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
+  function uid() { return nextId++; }
+  function noteIds() {
+    const all = stamps.concat(rivers, roads, borders, labels);
+    for (let i = 0; i < all.length; i++) if (all[i].id >= nextId) nextId = all[i].id + 1;
+  }
+  function hexRgb(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  function rgba(hex, a) {
+    const c = hexRgb(hex);
+    return 'rgba(' + c[0] + ',' + c[1] + ',' + c[2] + ',' + a + ')';
+  }
+  function hash2(ix, iy, s) {
+    let n = Math.imul(ix | 0, 374761393) + Math.imul(iy | 0, 668265263) + Math.imul(s | 0, 1442695041);
+    n = Math.imul(n ^ (n >>> 13), 1274126177);
+    return ((n ^ (n >>> 16)) >>> 0) / 4294967296;
+  }
+  function vnoise(x, y, s) {
+    const x0 = Math.floor(x), y0 = Math.floor(y);
+    const xf = x - x0, yf = y - y0;
+    const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+    const a = hash2(x0, y0, s), b = hash2(x0 + 1, y0, s);
+    const c = hash2(x0, y0 + 1, s), d = hash2(x0 + 1, y0 + 1, s);
+    return a * (1 - u) * (1 - v) + b * u * (1 - v) + c * (1 - u) * v + d * u * v;
+  }
+  function fbm(x, y, s, oct) {
+    let a = 0, f = 1, amp = 1, sum = 0;
+    for (let i = 0; i < oct; i++) {
+      a += amp * vnoise(x * f, y * f, (s + i * 101) | 0);
+      sum += amp; amp *= 0.5; f *= 2.03;
+    }
+    return a / sum;
+  }
+  function mulberry32(a) {
+    let t = a >>> 0;
+    return function () {
+      t = (t + 0x6D2B79F5) >>> 0;
+      let x = Math.imul(t ^ (t >>> 15), 1 | t);
+      x = (x + Math.imul(x ^ (x >>> 7), 61 | x)) ^ x;
+      return ((x ^ (x >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+  function smoothstep(e0, e1, x) {
+    const t = clamp((x - e0) / (e1 - e0 || 1), 0, 1);
+    return t * t * (3 - 2 * t);
+  }
+  function hAt(x, y) {
+    if (x < 0) x = 0; else if (x >= W) x = W - 1;
+    if (y < 0) y = 0; else if (y >= H) y = H - 1;
+    return height[y * W + x];
+  }
+  function layerOn(name) {
+    if (!features.layers) return true;
+    return layers[name] !== false;
+  }
+  function toast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.hidden = false;
+    clearTimeout(toast._t);
+    toast._t = setTimeout(function () { el.hidden = true; }, 1700);
+  }
+  function setHint(text) { hintEl.textContent = text; }
+
+  function buildPaper() {
+    const ctx = paperC.getContext('2d');
+    const img = ctx.createImageData(W, H);
+    const d = img.data;
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const n = hash2(x >> 1, y >> 1, 99);
+        const n2 = hash2(x >> 4, y >> 4, 51);
+        const fiber = (y % 7 === 0 && hash2(x >> 3, y, 7) > 0.72) ? -18 : 0;
+        const v = 206 + n * 34 + n2 * 12 + fiber;
+        const i = (y * W + x) * 4;
+        d[i] = v; d[i + 1] = v * 0.93; d[i + 2] = v * 0.76; d[i + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+  }
+
+  function paintTerrainDisk(x, y, hex, radius) {
+    const g = tctx.createRadialGradient(x, y, 0, x, y, radius);
+    g.addColorStop(0, hex);
+    g.addColorStop(0.55, rgba(hex, 0.55));
+    g.addColorStop(1, rgba(hex, 0));
+    tctx.fillStyle = g;
+    tctx.beginPath();
+    tctx.arc(x, y, radius, 0, Math.PI * 2);
+    tctx.fill();
+  }
+  function paintRegionDisk(x, y, hex, radius) {
+    const g = rctx.createRadialGradient(x, y, 0, x, y, radius);
+    g.addColorStop(0, rgba(hex, 0.55));
+    g.addColorStop(1, rgba(hex, 0));
+    rctx.fillStyle = g;
+    rctx.beginPath();
+    rctx.arc(x, y, radius, 0, Math.PI * 2);
+    rctx.fill();
+  }
+  function forBrush(cx, cy, radius, fn) {
+    const r = Math.ceil(radius);
+    const x0 = Math.max(0, Math.floor(cx - r));
+    const y0 = Math.max(0, Math.floor(cy - r));
+    const x1 = Math.min(W - 1, Math.ceil(cx + r));
+    const y1 = Math.min(H - 1, Math.ceil(cy + r));
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        const dist = Math.hypot(x - cx, y - cy) / radius;
+        if (dist >= 1) continue;
+        const fall = (1 - dist) * (1 - dist);
+        fn(x, y, fall);
+      }
+    }
+    return { x0: x0, y0: y0, x1: x1 + 1, y1: y1 + 1 };
+  }
+
+  function rebuildShade(x0, y0, x1, y1) {
+    x0 = clamp(x0 | 0, 0, W - 1); y0 = clamp(y0 | 0, 0, H - 1);
+    x1 = clamp(x1 | 0, x0 + 1, W); y1 = clamp(y1 | 0, y0 + 1, H);
+    const img = sctx.getImageData(x0, y0, x1 - x0, y1 - y0);
+    const d = img.data;
+    const alt = 0.75, az = Math.PI * 1.2;
+    const lx = Math.cos(alt) * Math.cos(az);
+    const ly = Math.cos(alt) * Math.sin(az);
+    const lz = Math.sin(alt);
+    const zScale = 42;
+    let p = 0;
+    for (let y = y0; y < y1; y++) {
+      for (let x = x0; x < x1; x++, p++) {
+        const dx = (hAt(x + 1, y) - hAt(x - 1, y)) * zScale;
+        const dy = (hAt(x, y + 1) - hAt(x, y - 1)) * zScale;
+        const nx = -dx, ny = -dy, nz = 1;
+        const len = Math.hypot(nx, ny, nz) || 1;
+        const nd = (nx / len) * lx + (ny / len) * ly + (nz / len) * lz;
+        const o = p * 4;
+        const h = height[y * W + x];
+        if (h < sea - 0.004) { d[o + 3] = 0; continue; }
+        if (nd < 0.55) {
+          const a = ((0.55 - nd) / 0.55) * 150;
+          d[o] = 42; d[o + 1] = 34; d[o + 2] = 26; d[o + 3] = a;
+        } else {
+          const a = ((nd - 0.55) / 0.45) * 110;
+          d[o] = 255; d[o + 1] = 248; d[o + 2] = 236; d[o + 3] = a;
+        }
+      }
+    }
+    sctx.putImageData(img, x0, y0);
+  }
+  function rebuildWater(x0, y0, x1, y1) {
+    x0 = clamp(x0 | 0, 0, W - 1); y0 = clamp(y0 | 0, 0, H - 1);
+    x1 = clamp(x1 | 0, x0 + 1, W); y1 = clamp(y1 | 0, y0 + 1, H);
+    const img = wctx.getImageData(x0, y0, x1 - x0, y1 - y0);
+    const d = img.data;
+    let p = 0;
+    for (let y = y0; y < y1; y++) {
+      for (let x = x0; x < x1; x++, p++) {
+        const h = height[y * W + x];
+        const n = hash2(x, y, 3);
+        const o = p * 4;
+        if (h < sea) {
+          const depth = clamp((sea - h) / 0.22, 0, 1);
+          const shall = 1 - depth;
+          d[o] = 30 + shall * 55 + n * 8;
+          d[o + 1] = 78 + shall * 70;
+          d[o + 2] = 104 + shall * 40;
+          d[o + 3] = 255;
+        } else if (h < sea + 0.016) {
+          d[o] = 216; d[o + 1] = 196; d[o + 2] = 150; d[o + 3] = 210;
+        } else if (h < sea + 0.03) {
+          d[o] = 226; d[o + 1] = 234; d[o + 2] = 226; d[o + 3] = 150;
+        } else {
+          d[o + 3] = 0;
+        }
+      }
+    }
+    wctx.putImageData(img, x0, y0);
+  }
+
+  function buildCoast() {
+    const smooth = new Float32Array(W * H);
+    const tmp = new Float32Array(W * H);
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        let s = 0;
+        for (let k = -1; k <= 1; k++) s += hAt(x + k, y);
+        tmp[y * W + x] = s / 3;
+      }
+    }
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        let s = 0;
+        for (let k = -1; k <= 1; k++) {
+          const yy = clamp(y + k, 0, H - 1);
+          s += tmp[yy * W + x];
+        }
+        smooth[y * W + x] = s / 3;
+      }
+    }
+    const level = sea;
+    const segs = [];
+    function edgePoint(x, y, edge, h00, h10, h11, h01) {
+      function lp(x0, y0, h0, x1, y1, h1) {
+        const den = h1 - h0;
+        const t = Math.abs(den) < 1e-6 ? 0.5 : clamp((level - h0) / den, 0, 1);
+        return { x: x0 + (x1 - x0) * t, y: y0 + (y1 - y0) * t };
+      }
+      if (edge === 0) return lp(x, y, h00, x + 1, y, h10);
+      if (edge === 1) return lp(x + 1, y, h10, x + 1, y + 1, h11);
+      if (edge === 2) return lp(x, y + 1, h01, x + 1, y + 1, h11);
+      return lp(x, y, h00, x, y + 1, h01);
+    }
+    const pairs = {
+      1: [[3, 0]], 2: [[0, 1]], 3: [[3, 1]], 4: [[1, 2]],
+      6: [[0, 2]], 7: [[3, 2]], 8: [[2, 3]], 9: [[0, 2]],
+      11: [[2, 1]], 12: [[1, 3]], 13: [[1, 0]], 14: [[0, 3]]
+    };
+    for (let y = 0; y < H - 1; y++) {
+      for (let x = 0; x < W - 1; x++) {
+        const h00 = smooth[y * W + x];
+        const h10 = smooth[y * W + x + 1];
+        const h11 = smooth[(y + 1) * W + x + 1];
+        const h01 = smooth[(y + 1) * W + x];
+        let code = (h00 >= level ? 1 : 0) | (h10 >= level ? 2 : 0) | (h11 >= level ? 4 : 0) | (h01 >= level ? 8 : 0);
+        if (code === 0 || code === 15) continue;
+        let list = pairs[code];
+        if (code === 5 || code === 10) {
+          const avg = (h00 + h10 + h11 + h01) / 4;
+          if (code === 5) list = avg >= level ? [[3, 2], [0, 1]] : [[3, 0], [1, 2]];
+          else list = avg >= level ? [[0, 3], [1, 2]] : [[0, 1], [2, 3]];
+        }
+        if (!list) continue;
+        for (let k = 0; k < list.length; k++) {
+          const a = edgePoint(x, y, list[k][0], h00, h10, h11, h01);
+          const b = edgePoint(x, y, list[k][1], h00, h10, h11, h01);
+          segs.push([a, b]);
+        }
+      }
+    }
+    coastLines = chainSegments(segs);
+  }
+  function chainSegments(segs) {
+    function key(p) { return Math.round(p.x * 2) + ',' + Math.round(p.y * 2); }
+    const adj = new Map();
+    function add(k, segIdx, end) {
+      let list = adj.get(k);
+      if (!list) { list = []; adj.set(k, list); }
+      list.push({ segIdx: segIdx, end: end });
+    }
+    for (let i = 0; i < segs.length; i++) {
+      add(key(segs[i][0]), i, 0);
+      add(key(segs[i][1]), i, 1);
+    }
+    const used = new Array(segs.length).fill(false);
+    const lines = [];
+    for (let i = 0; i < segs.length; i++) {
+      if (used[i]) continue;
+      used[i] = true;
+      const line = [segs[i][0], segs[i][1]];
+      let guard = 0;
+      while (guard++ < segs.length) {
+        const opts = (adj.get(key(line[line.length - 1])) || []).filter(function (o) { return !used[o.segIdx]; });
+        if (!opts.length) break;
+        const o = opts[0];
+        used[o.segIdx] = true;
+        const s = segs[o.segIdx];
+        line.push(o.end === 0 ? s[1] : s[0]);
+      }
+      guard = 0;
+      while (guard++ < segs.length) {
+        const opts = (adj.get(key(line[0])) || []).filter(function (o) { return !used[o.segIdx]; });
+        if (!opts.length) break;
+        const o = opts[0];
+        used[o.segIdx] = true;
+        const s = segs[o.segIdx];
+        line.unshift(o.end === 0 ? s[1] : s[0]);
+      }
+      if (line.length >= 2) lines.push(line);
+    }
+    return lines;
+  }
+
+  function rebuildAll() {
+    rebuildShade(0, 0, W, H);
+    rebuildWater(0, 0, W, H);
+    buildCoast();
+    dirty = true;
+  }
+
+  function placeName(s, salt) {
+    const A = ['Harth', 'Bramble', 'Cinder', 'Ash', 'Moss', 'Salt', 'Iron', 'Holly', 'Dun', 'Fen', 'Wold', 'Hale', 'Red', 'Gray', 'Yew', 'Birch', 'Quarry', 'Lark', 'Vesper', 'Marrow'];
+    const B = ['ford', 'wick', 'keep', 'mere', 'barrow', 'gate', 'hollow', 'reach', 'water', 'hold', 'cross', 'field', 'haven', 'watch', 'fall', 'ridge', 'marsh', 'end', 'bridge', 'moor'];
+    const r = mulberry32((s + salt * 9176) >>> 0);
+    return A[Math.floor(r() * A.length)] + B[Math.floor(r() * B.length)];
+  }
+  function chaikin(pts) {
+    if (pts.length < 3) return pts;
+    const o = [pts[0]];
+    for (let i = 0; i < pts.length - 1; i++) {
+      const a = pts[i], b = pts[i + 1];
+      o.push({ x: a.x * 0.75 + b.x * 0.25, y: a.y * 0.75 + b.y * 0.25 });
+      o.push({ x: a.x * 0.25 + b.x * 0.75, y: a.y * 0.25 + b.y * 0.75 });
+    }
+    o.push(pts[pts.length - 1]);
+    return o;
+  }
+  function flowRiver(sx, sy) {
+    let x = sx, y = sy;
+    const raw = [{ x: x, y: y }];
+    const seen = new Set([(y | 0) * W + (x | 0)]);
+    for (let step = 0; step < 700; step++) {
+      let best = hAt(x | 0, y | 0), bx = x, by = y, moved = false;
+      for (let dy = -5; dy <= 5; dy++) {
+        for (let dx = -5; dx <= 5; dx++) {
+          if (!dx && !dy) continue;
+          const nx = (x | 0) + dx, ny = (y | 0) + dy;
+          if (nx < 1 || ny < 1 || nx >= W - 1 || ny >= H - 1) continue;
+          const hv = height[ny * W + nx];
+          if (hv < best - 0.0004) { best = hv; bx = nx; by = ny; moved = true; }
+        }
+      }
+      if (!moved) {
+        let leap = null, leapH = best;
+        for (let dy = -16; dy <= 16; dy += 2) {
+          for (let dx = -16; dx <= 16; dx += 2) {
+            const nx = (x | 0) + dx, ny = (y | 0) + dy;
+            if (nx < 1 || ny < 1 || nx >= W - 1 || ny >= H - 1) continue;
+            const k = ny * W + nx;
+            if (seen.has(k)) continue;
+            const hv = height[k];
+            if (hv < leapH - 0.003) { leapH = hv; leap = { x: nx, y: ny }; }
+          }
+        }
+        if (!leap) break;
+        bx = leap.x; by = leap.y; best = leapH;
+      }
+      x = bx; y = by;
+      const k = (y | 0) * W + (x | 0);
+      if (seen.has(k)) break;
+      seen.add(k);
+      raw.push({ x: x, y: y });
+      if (best < sea) break;
+    }
+    if (raw.length < 4) return null;
+    const sparse = [];
+    for (let i = 0; i < raw.length; i += 3) sparse.push(raw[i]);
+    sparse.push(raw[raw.length - 1]);
+    return chaikin(sparse);
+  }
+
+  function generate(nextSeed, nextLat, nextLon) {
+    seed = (Number(nextSeed) === Number(nextSeed)) ? Math.round(Number(nextSeed)) : seed;
+    if (arguments.length > 1) lat = nextLat == null || nextLat === '' || Number(nextLat) !== Number(nextLat) ? null : Number(nextLat);
+    if (arguments.length > 2) lon = nextLon == null || nextLon === '' || Number(nextLon) !== Number(nextLon) ? null : Number(nextLon);
+    const ox = (lon || 0) * 0.17;
+    const oy = (lat || 0) * 0.17;
+    const cold = lat == null ? 0.12 : clamp((Math.abs(lat) - 28) / 62, 0, 1);
+    const rand = mulberry32(seed >>> 0);
+    const blob = [];
+    for (let i = 0; i < 3; i++) {
+      blob.push({
+        x: 0.34 + rand() * 0.32,
+        y: 0.32 + rand() * 0.36,
+        r: 0.22 + rand() * 0.18
+      });
+    }
+    genStats = { snow: 0, water: 0, land: 0 };
+    let maxH = sea;
+    const img = tctx.createImageData(W, H);
+    const data = img.data;
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const nx = x / W, ny = y / H;
+        let mask = 0;
+        for (let i = 0; i < blob.length; i++) {
+          const dx = (nx - blob[i].x) / 1.12, dy = ny - blob[i].y;
+          const dist = Math.hypot(dx, dy);
+          const b = 1 - smoothstep(blob[i].r * 0.45, blob[i].r, dist);
+          if (b > mask) mask = b;
+        }
+        const warpX = fbm(x * 0.01, y * 0.01, seed + 3, 3);
+        const warpY = fbm(x * 0.01 + 4.2, y * 0.01, seed + 8, 3);
+        const sx = x * 0.008 + warpX * 1.7 + ox;
+        const sy = y * 0.008 + warpY * 1.7 + oy;
+        const n = fbm(sx, sy, seed, 5);
+        const rid = 1 - Math.abs(fbm(sx * 1.35 + 2, sy * 1.35, seed + 17, 4) * 2 - 1);
+        let h = (n * 0.74 + rid * 0.26) * (0.28 + 0.72 * mask);
+        h = clamp(h * 0.96 + 0.02, 0, 1);
+        height[y * W + x] = h;
+        if (h > maxH) maxH = h;
+      }
+    }
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const h = height[y * W + x];
+        const m = fbm(x * 0.02 + 9, y * 0.02, seed + 90, 4);
+        const slope = Math.abs(h - hAt(x + 1, y)) + Math.abs(h - hAt(x, y + 1));
+        let biome;
+        if (h < sea) biome = 'water';
+        else {
+          const elev = (h - sea) / (1 - sea);
+          const rel = (h - sea) / Math.max(0.08, maxH - sea);
+          const snowCut = 0.86 - cold * 0.42;
+          if (rel > snowCut) biome = 'snow';
+          else if (slope > 0.05 && elev > 0.28) biome = 'rock';
+          else if (elev < 0.09) biome = m > 0.62 ? 'swamp' : 'desert';
+          else if (m > 0.66 && elev < 0.32) biome = 'swamp';
+          else if (m < 0.34 && elev < 0.5 && cold < 0.45) biome = 'desert';
+          else if (m > 0.56 && elev > 0.16 && elev < 0.74) biome = 'forest';
+          else if (m > 0.4 && m < 0.56 && elev > 0.14 && elev < 0.42 && slope < 0.02) biome = 'farmland';
+          else biome = 'grass';
+        }
+        if (biome === 'water') genStats.water++;
+        else genStats.land++;
+        if (biome === 'snow') genStats.snow++;
+        const jitter = 0.86 + hash2(x, y, seed + 4) * 0.28;
+        let rgb = hexRgb(TERRAIN[biome].color);
+        if (biome === 'farmland' && (y % 5 === 0)) rgb = [rgb[0] * 0.86, rgb[1] * 0.9, rgb[2] * 0.7];
+        const o = (y * W + x) * 4;
+        data[o] = clamp(rgb[0] * jitter, 0, 255);
+        data[o + 1] = clamp(rgb[1] * jitter, 0, 255);
+        data[o + 2] = clamp(rgb[2] * jitter, 0, 255);
+        data[o + 3] = 255;
+      }
+    }
+    tctx.putImageData(img, 0, 0);
+    rctx.clearRect(0, 0, W, H);
+    stamps.length = 0; rivers.length = 0; roads.length = 0; borders.length = 0; labels.length = 0;
+    draft = { kind: null, points: [] };
+    selection = null;
+    const peaks = [];
+    for (let y = 8; y < H - 8; y += 6) {
+      for (let x = 8; x < W - 8; x += 6) {
+        const h = height[y * W + x];
+        if (h < sea + 0.18) continue;
+        let top = true;
+        for (let dy = -6; dy <= 6 && top; dy += 3) {
+          for (let dx = -6; dx <= 6; dx += 3) {
+            if (height[(y + dy) * W + (x + dx)] > h + 0.004) { top = false; break; }
+          }
+        }
+        if (top) peaks.push({ x: x, y: y, h: h });
+      }
+    }
+    peaks.sort(function (a, b) { return b.h - a.h; });
+    const used = [];
+    function far(x, y, min) {
+      for (let i = 0; i < used.length; i++) if (Math.hypot(used[i].x - x, used[i].y - y) < min) return false;
+      return true;
+    }
+    function addStamp(type, x, y, size) {
+      stamps.push({ id: uid(), type: type, x: x, y: y, size: size, rot: (hash2(x, y, seed) - 0.5) * 0.6, color: ink });
+      used.push({ x: x, y: y });
+    }
+    let mtn = 0;
+    for (let i = 0; i < peaks.length && mtn < 4; i++) {
+      if (mtn && !far(peaks[i].x, peaks[i].y, 36)) continue;
+      addStamp('mountain', peaks[i].x, peaks[i].y, 1.05 + (mtn % 3) * 0.1);
+      mtn++;
+    }
+    let hills = 0;
+    for (let i = 0; i < peaks.length && hills < 3; i++) {
+      if (!far(peaks[i].x, peaks[i].y, 30)) continue;
+      addStamp('hill', peaks[i].x, peaks[i].y, 0.9);
+      hills++;
+    }
+    const coastPts = [];
+    for (let y = 2; y < H - 2; y += 4) {
+      for (let x = 2; x < W - 2; x += 4) {
+        const h = height[y * W + x];
+        if (h > sea + 0.02 && h < sea + 0.08 && hAt(x + 3, y) < sea) coastPts.push({ x: x, y: y, h: h });
+      }
+    }
+    function pushLabel(lab) {
+      const reach = function (text) { return Math.max(46, String(text || '').length * 3.6); };
+      for (let n = 0; n < 8; n++) {
+        let clash = false;
+        const need = reach(lab.text);
+        for (let i = 0; i < labels.length; i++) {
+          if (Math.hypot(labels[i].x - lab.x, labels[i].y - lab.y) < Math.max(need, reach(labels[i].text))) { clash = true; break; }
+        }
+        if (!clash) break;
+        lab.y += 16;
+        lab.x += (n % 2 ? 18 : -16);
+      }
+      lab.x = clamp(lab.x, 24, W - 24);
+      lab.y = clamp(lab.y, 18, H - 18);
+      labels.push(lab);
+    }
+    const keep = peaks.length ? peaks[Math.min(2, peaks.length - 1)] : { x: W * 0.45, y: H * 0.45, h: 0.6 };
+    addStamp('castle', keep.x, keep.y + 10, 1.15);
+    const keepName = placeName(seed, 1);
+    pushLabel({ id: uid(), text: keepName, x: keep.x, y: keep.y + 28, size: 15, curve: false, italic: false });
+    let town = coastPts.length ? coastPts[Math.floor(coastPts.length * 0.35) % coastPts.length] : { x: keep.x + 40, y: keep.y + 30 };
+    if (!far(town.x, town.y, 20)) town = { x: clamp(town.x + 24, 8, W - 8), y: town.y };
+    addStamp('town', town.x, town.y, 1);
+    const townName = placeName(seed, 2);
+    pushLabel({ id: uid(), text: townName, x: town.x, y: town.y + 18, size: 14, curve: false, italic: false });
+    addStamp('village', clamp(town.x - 36, 10, W - 10), clamp(town.y - 10, 10, H - 10), 0.85);
+    addStamp('village', clamp(keep.x + 34, 10, W - 10), clamp(keep.y + 8, 10, H - 10), 0.8);
+    pushLabel({ id: uid(), text: placeName(seed, 3), x: clamp(town.x - 36, 16, W - 16), y: clamp(town.y - 20, 16, H - 16), size: 12, curve: false, italic: false });
+    addStamp('tower', clamp(town.x + 28, 8, W - 8), clamp(town.y - 16, 8, H - 8), 0.9);
+    let treesN = 0;
+    for (let y = 10; y < H - 10 && treesN < 10; y += 16) {
+      for (let x = 10; x < W - 10 && treesN < 10; x += 18) {
+        const h = height[y * W + x];
+        const m = fbm(x * 0.02 + 9, y * 0.02, seed + 90, 3);
+        if (h > sea + 0.08 && h < sea + 0.32 && m > 0.55 && far(x, y, 22)) {
+          addStamp('trees', x, y, 0.75 + hash2(x, y, 5) * 0.45);
+          treesN++;
+        }
+      }
+    }
+    if (peaks[0]) {
+      let river = flowRiver(peaks[0].x, peaks[0].y);
+      if (!river) {
+        let seaPt = null, bestD = 1e9;
+        for (let yy = 6; yy < H - 6; yy += 6) {
+          for (let xx = 6; xx < W - 6; xx += 6) {
+            if (height[yy * W + xx] >= sea) continue;
+            const d = Math.hypot(xx - peaks[0].x, yy - peaks[0].y);
+            if (d < bestD) { bestD = d; seaPt = { x: xx, y: yy }; }
+          }
+        }
+        if (seaPt) {
+          river = chaikin([
+            { x: peaks[0].x, y: peaks[0].y },
+            { x: (peaks[0].x + seaPt.x) / 2 + 8, y: (peaks[0].y + seaPt.y) / 2 },
+            seaPt
+          ]);
+        }
+      }
+      if (river) {
+        rivers.push({ id: uid(), points: river, w0: 7.5, w1: 1.4 });
+        const mid = river[river.length >> 1];
+        pushLabel({ id: uid(), text: placeName(seed, 4) + ' River', x: mid.x + 18, y: mid.y - 16, size: 12, curve: false, italic: true });
+      }
+    }
+    const seaLabel = { id: uid(), text: 'The ' + placeName(seed, 5), x: W * 0.2, y: H * 0.55, size: 16, curve: false, italic: true };
+    let bestSea = null, bestScore = 1e9;
+    for (let y = 28; y < H - 28; y += 8) {
+      for (let x = 28; x < W - 28; x += 8) {
+        if (height[y * W + x] > sea - 0.05) continue;
+        let landNear = 0;
+        for (let dy = -16; dy <= 16; dy += 8) {
+          for (let dx = -16; dx <= 16; dx += 8) if (hAt(x + dx, y + dy) > sea) landNear++;
+        }
+        if (landNear) continue;
+        const score = Math.hypot(x - W * 0.22, y - H * 0.58);
+        if (score < bestScore) { bestScore = score; bestSea = { x: x, y: y }; }
+      }
+    }
+    if (bestSea) { seaLabel.x = bestSea.x; seaLabel.y = bestSea.y; }
+    pushLabel(seaLabel);
+    if (peaks[0]) pushLabel({ id: uid(), text: placeName(seed, 6) + ' Peaks', x: peaks[0].x - 42, y: peaks[0].y - 28, size: 13, curve: false, italic: false });
+    roads.push({
+      id: uid(),
+      style: 'solid',
+      points: [
+        { x: town.x, y: town.y },
+        { x: (town.x + keep.x) / 2 + 8, y: (town.y + keep.y) / 2 },
+        { x: keep.x, y: keep.y + 12 }
+      ]
+    });
+    const ring = [];
+    for (let i = 0; i < 14; i++) {
+      const a = (i / 14) * Math.PI * 2;
+      const jx = (hash2(i, seed, 12) - 0.5) * 10;
+      const jy = (hash2(seed, i, 13) - 0.5) * 8;
+      ring.push({ x: keep.x + Math.cos(a) * 54 + jx, y: keep.y + Math.sin(a) * 36 + jy });
+    }
+    ring.push({ x: ring[0].x, y: ring[0].y });
+    borders.push({ id: uid(), style: 'dashed', points: ring });
+    paintRegionDisk(keep.x, keep.y, REGION_COLORS[0], 70);
+    noteIds();
+    rebuildAll();
+    syncLink();
+    seedInput.value = String(seed);
+    document.title = 'Landbox map ' + seed;
+    setHint('Seed ' + seed + '. Paint, stamps, rivers, and names stay editable.');
+  }
+
+  function syncLink() {
+    const p = new URLSearchParams();
+    p.set('seed', String(seed));
+    if (lat != null) p.set('lat', String(lat));
+    if (lon != null) p.set('lon', String(lon));
+    const hash = '#' + p.toString();
+    backLink.href = 'landbox-mapmaker-globe-v1.html' + hash;
+    if (location.hash !== hash) history.replaceState(null, '', hash);
+    if (lat == null && lon == null) {
+      geoEl.hidden = true;
+      geoEl.textContent = '';
+    } else {
+      geoEl.hidden = false;
+      const ns = lat == null ? '' : (Math.abs(lat).toFixed(2) + '°' + (lat >= 0 ? 'N' : 'S'));
+      const ew = lon == null ? '' : (Math.abs(lon).toFixed(2) + '°' + (lon >= 0 ? 'E' : 'W'));
+      geoEl.textContent = 'From the globe' + (ns || ew ? ' · ' + [ns, ew].filter(Boolean).join(', ') : '');
+    }
+  }
+
+  function parseHash() {
+    const q = new URLSearchParams((location.hash || '').replace(/^#/, ''));
+    const s = q.get('seed');
+    const la = q.get('lat');
+    const lo = q.get('lon');
+    const seedN = s != null && s !== '' && Number(s) === Number(s) ? Number(s) : 20261110;
+    const latN = la != null && la !== '' && Number(la) === Number(la) ? Number(la) : null;
+    const lonN = lo != null && lo !== '' && Number(lo) === Number(lo) ? Number(lo) : null;
+    return { seed: seedN, lat: latN, lon: lonN };
+  }
+
+  function drawStampIcon(ctx, type) {
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.lineWidth = 1.6;
+    ctx.strokeStyle = ctx.fillStyle;
+    if (type === 'mountain') {
+      ctx.beginPath();
+      ctx.moveTo(-18, 12); ctx.lineTo(-4, -16); ctx.lineTo(2, -4); ctx.lineTo(16, -14); ctx.lineTo(20, 12); ctx.closePath();
+      ctx.globalAlpha = 0.22; ctx.fill(); ctx.globalAlpha = 1; ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(-8, -6); ctx.lineTo(-4, -16); ctx.lineTo(0, -6);
+      ctx.moveTo(-12, 8); ctx.lineTo(-6, -2); ctx.moveTo(-6, 8); ctx.lineTo(-1, 0); ctx.moveTo(6, 8); ctx.lineTo(10, -2);
+      ctx.stroke();
+    } else if (type === 'hill') {
+      ctx.beginPath(); ctx.ellipse(-2, 6, 16, 8, 0, Math.PI, 0); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(-6, 8, 9, 5, 0, Math.PI, 0); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(7, 7, 7, 4, 0, Math.PI, 0); ctx.stroke();
+    } else if (type === 'trees') {
+      const blobs = [[-7, 2, 7], [6, -1, 8], [0, 7, 6]];
+      ctx.globalAlpha = 0.28;
+      blobs.forEach(function (b) { ctx.beginPath(); ctx.arc(b[0], b[1], b[2], 0, Math.PI * 2); ctx.fill(); });
+      ctx.globalAlpha = 1;
+      blobs.forEach(function (b) { ctx.beginPath(); ctx.arc(b[0], b[1], b[2], 0, Math.PI * 2); ctx.stroke(); });
+      ctx.beginPath(); ctx.moveTo(-4, 8); ctx.lineTo(-4, 14); ctx.moveTo(5, 7); ctx.lineTo(5, 13); ctx.stroke();
+    } else if (type === 'castle') {
+      ctx.globalAlpha = 0.2; ctx.fillRect(-14, -4, 28, 16); ctx.globalAlpha = 1;
+      ctx.strokeRect(-14, -4, 28, 16);
+      ctx.strokeRect(-16, -14, 8, 12); ctx.strokeRect(8, -14, 8, 12);
+      ctx.beginPath();
+      ctx.moveTo(-16, -14); ctx.lineTo(-12, -18); ctx.lineTo(-8, -14);
+      ctx.moveTo(8, -14); ctx.lineTo(12, -18); ctx.lineTo(16, -14);
+      ctx.moveTo(-4, 12); ctx.lineTo(-4, 4); ctx.lineTo(4, 4); ctx.lineTo(4, 12);
+      ctx.moveTo(-14, -4); ctx.lineTo(-14, -8); ctx.lineTo(-10, -8); ctx.lineTo(-10, -4);
+      ctx.moveTo(-6, -4); ctx.lineTo(-6, -8); ctx.lineTo(-2, -8); ctx.lineTo(-2, -4);
+      ctx.stroke();
+    } else if (type === 'town') {
+      function house(x, y, w, hgt) {
+        ctx.beginPath();
+        ctx.moveTo(x, y); ctx.lineTo(x, y - hgt); ctx.lineTo(x + w / 2, y - hgt - 6); ctx.lineTo(x + w, y - hgt); ctx.lineTo(x + w, y);
+        ctx.closePath(); ctx.globalAlpha = 0.18; ctx.fill(); ctx.globalAlpha = 1; ctx.stroke();
+      }
+      house(-16, 10, 12, 10); house(-2, 8, 14, 12); house(12, 10, 8, 8);
+      ctx.beginPath(); ctx.moveTo(4, -4); ctx.lineTo(4, -14); ctx.lineTo(7, -11); ctx.lineTo(4, -14); ctx.lineTo(1, -11); ctx.stroke();
+    } else if (type === 'village') {
+      function cot(x, y) {
+        ctx.beginPath();
+        ctx.moveTo(x, y); ctx.lineTo(x, y - 8); ctx.lineTo(x + 6, y - 13); ctx.lineTo(x + 12, y - 8); ctx.lineTo(x + 12, y);
+        ctx.closePath(); ctx.stroke();
+      }
+      cot(-16, 8); cot(-2, 10); cot(10, 7);
+      ctx.beginPath(); ctx.arc(18, 4, 3.5, 0, Math.PI * 2); ctx.moveTo(18, 7); ctx.lineTo(18, 12); ctx.stroke();
+    } else if (type === 'tower') {
+      ctx.beginPath();
+      ctx.moveTo(-7, 14); ctx.lineTo(-7, -8); ctx.lineTo(0, -18); ctx.lineTo(7, -8); ctx.lineTo(7, 14);
+      ctx.closePath(); ctx.globalAlpha = 0.2; ctx.fill(); ctx.globalAlpha = 1; ctx.stroke();
+      ctx.beginPath();
+      ctx.moveTo(-3, 14); ctx.lineTo(-3, 8); ctx.lineTo(3, 8); ctx.lineTo(3, 14);
+      ctx.moveTo(0, -2); ctx.lineTo(0, -6); ctx.moveTo(-4, 2); ctx.lineTo(4, 2);
+      ctx.stroke();
+    }
+  }
+  function drawStamp(ctx, s) {
+    ctx.save();
+    ctx.translate(s.x, s.y);
+    ctx.rotate(s.rot || 0);
+    ctx.scale(s.size || 1, s.size || 1);
+    ctx.fillStyle = s.color || ink;
+    ctx.strokeStyle = s.color || ink;
+    drawStampIcon(ctx, s.type);
+    ctx.restore();
+  }
+
+  function normalAt(line, i) {
+    const a = line[Math.max(0, i - 1)];
+    const b = line[Math.min(line.length - 1, i + 1)];
+    let nx = -(b.y - a.y), ny = b.x - a.x;
+    const len = Math.hypot(nx, ny) || 1;
+    return { x: nx / len, y: ny / len };
+  }
+  function taperRibbon(points, w0, w1) {
+    if (points.length < 2) return null;
+    let total = 0;
+    const acc = [0];
+    for (let i = 1; i < points.length; i++) {
+      total += Math.hypot(points[i].x - points[i - 1].x, points[i].y - points[i - 1].y);
+      acc.push(total);
+    }
+    if (total < 0.5) return null;
+    const left = [], right = [];
+    for (let i = 0; i < points.length; i++) {
+      const t = acc[i] / total;
+      const w = w0 + (w1 - w0) * t;
+      const n = normalAt(points, i);
+      left.push({ x: points[i].x + n.x * w * 0.5, y: points[i].y + n.y * w * 0.5 });
+      right.push({ x: points[i].x - n.x * w * 0.5, y: points[i].y - n.y * w * 0.5 });
+    }
+    return left.concat(right.reverse());
+  }
+  function strokePoly(ctx, points) {
+    if (!points || points.length < 2) return;
+    ctx.beginPath();
+    ctx.moveTo(points[0].x, points[0].y);
+    for (let i = 1; i < points.length; i++) ctx.lineTo(points[i].x, points[i].y);
+    ctx.stroke();
+  }
+  function applyStyle(ctx, style, width) {
+    ctx.lineWidth = width;
+    ctx.lineCap = style === 'dotted' ? 'round' : 'butt';
+    ctx.lineJoin = 'round';
+    if (style === 'dashed') ctx.setLineDash([7, 6]);
+    else if (style === 'dotted') ctx.setLineDash([0.1, 6]);
+    else ctx.setLineDash([]);
+  }
+  function drawLabel(ctx, lab) {
+    const family = 'Palatino, Georgia, "Times New Roman", serif';
+    ctx.font = (lab.italic ? 'italic ' : '') + (lab.size || 14) + 'px ' + family;
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(243,234,219,0.88)';
+    ctx.fillStyle = '#1c140e';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    if (!lab.curve) {
+      ctx.strokeText(lab.text, lab.x, lab.y);
+      ctx.fillText(lab.text, lab.x, lab.y);
+      return;
+    }
+    const text = lab.text || '';
+    const width = Math.max(8, ctx.measureText(text).width);
+    const radius = Math.max(46, width / 1.35);
+    const sweep = width / radius;
+    let acc = 0;
+    const cx = lab.x, cy = lab.y + radius * 0.15;
+    for (let i = 0; i < text.length; i++) {
+      const ch = text[i];
+      const cw = ctx.measureText(ch).width;
+      const a = -Math.PI / 2 - sweep / 2 + (acc + cw / 2) / radius;
+      ctx.save();
+      ctx.translate(cx + Math.cos(a) * radius, cy + Math.sin(a) * radius);
+      ctx.rotate(a + Math.PI / 2);
+      ctx.strokeText(ch, 0, 0);
+      ctx.fillText(ch, 0, 0);
+      ctx.restore();
+      acc += cw;
+    }
+  }
+  function offsetLine(line, dist) {
+    if (line.length < 2) return line;
+    const n0 = normalAt(line, Math.floor(line.length / 2));
+    const mid = line[line.length >> 1];
+    const hPos = sampleSmoothish(mid.x + n0.x * 3, mid.y + n0.y * 3);
+    const hNeg = sampleSmoothish(mid.x - n0.x * 3, mid.y - n0.y * 3);
+    const sign = hPos < hNeg ? 1 : -1;
+    return line.map(function (p, i) {
+      const n = normalAt(line, i);
+      return { x: p.x + n.x * dist * sign, y: p.y + n.y * dist * sign };
+    });
+  }
+  function sampleSmoothish(x, y) { return hAt(Math.round(x), Math.round(y)); }
+
+  function drawFrame(ctx, cssW, cssH) {
+    ctx.save();
+    ctx.strokeStyle = '#2a2118';
+    ctx.lineWidth = 2;
+    ctx.strokeRect(10, 10, cssW - 20, cssH - 20);
+    ctx.lineWidth = 1;
+    ctx.strokeRect(16, 16, cssW - 32, cssH - 32);
+    ctx.fillStyle = '#2a2118';
+    [[10, 10], [cssW - 10, 10], [10, cssH - 10], [cssW - 10, cssH - 10]].forEach(function (p) {
+      ctx.beginPath();
+      ctx.moveTo(p[0], p[1] - 6); ctx.lineTo(p[0] + 6, p[1]); ctx.lineTo(p[0], p[1] + 6); ctx.lineTo(p[0] - 6, p[1]);
+      ctx.closePath(); ctx.fill();
+    });
+    ctx.restore();
+  }
+  function drawCompass(ctx, cssW, cssH) {
+    if (cssW < 90 || cssH < 90) return;
+    const x = cssW - 58, y = cssH - 58, r = 26;
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.strokeStyle = '#2a2118';
+    ctx.fillStyle = '#2a2118';
+    ctx.lineWidth = 1.2;
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2); ctx.stroke();
+    ctx.beginPath(); ctx.arc(0, 0, 4, 0, Math.PI * 2); ctx.fill();
+    for (let i = 0; i < 8; i++) {
+      const a = -Math.PI / 2 + i * Math.PI / 4;
+      const long = i % 2 === 0;
+      const len = long ? r - 3 : r * 0.55;
+      ctx.beginPath();
+      ctx.moveTo(Math.cos(a) * 6, Math.sin(a) * 6);
+      ctx.lineTo(Math.cos(a + 0.18) * len, Math.sin(a + 0.18) * len);
+      ctx.lineTo(Math.cos(a) * (len + (long ? 6 : 2)), Math.sin(a) * (len + (long ? 6 : 2)));
+      ctx.lineTo(Math.cos(a - 0.18) * len, Math.sin(a - 0.18) * len);
+      ctx.closePath();
+      ctx.globalAlpha = long ? 0.9 : 0.45;
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+    ctx.font = '700 12px Palatino, Georgia, serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('N', 0, -r - 8);
+    ctx.restore();
+  }
+  function drawScale(ctx, cssW, cssH) {
+    const leagues = 50;
+    const px = leagues * 0.9 * cam.zoom;
+    const x = 18, y = cssH - 22;
+    ctx.save();
+    ctx.strokeStyle = '#2a2118';
+    ctx.fillStyle = '#2a2118';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(x, y); ctx.lineTo(x + px, y);
+    ctx.moveTo(x, y - 5); ctx.lineTo(x, y + 5);
+    ctx.moveTo(x + px, y - 5); ctx.lineTo(x + px, y + 5);
+    ctx.stroke();
+    ctx.font = '12px Palatino, Georgia, serif';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'bottom';
+    ctx.fillText(leagues + ' leagues', x, y - 6);
+    ctx.restore();
+  }
+  function drawGrid(ctx) {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(36, 28, 20, 0.35)';
+    ctx.lineWidth = 1 / cam.zoom;
+    ctx.beginPath();
+    for (let x = 0; x <= W; x += 32) { ctx.moveTo(x, 0); ctx.lineTo(x, H); }
+    for (let y = 0; y <= H; y += 32) { ctx.moveTo(0, y); ctx.lineTo(W, y); }
+    ctx.stroke();
+    ctx.restore();
+  }
+  function drawHex(ctx) {
+    const s = 18;
+    const h = Math.sin(Math.PI / 3) * s;
+    ctx.save();
+    ctx.strokeStyle = 'rgba(36, 28, 20, 0.4)';
+    ctx.lineWidth = 1 / cam.zoom;
+    ctx.beginPath();
+    for (let row = -1; row < H / (h * 2) + 2; row++) {
+      for (let col = -1; col < W / (s * 1.5) + 2; col++) {
+        const cx = col * s * 1.5;
+        const cy = row * h * 2 + (Math.abs(col) % 2 ? h : 0);
+        for (let i = 0; i < 6; i++) {
+          const a = Math.PI / 6 + i * Math.PI / 3;
+          const px = cx + Math.cos(a) * s, py = cy + Math.sin(a) * s;
+          if (i === 0) ctx.moveTo(px, py); else ctx.lineTo(px, py);
+        }
+        ctx.closePath();
+      }
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function draw() {
+    const cssW = stage.clientWidth, cssH = stage.clientHeight;
+    if (cssW < 2 || cssH < 2) return;
+    const sx = view.width / cssW, sy = view.height / cssH;
+    vctx.setTransform(sx, 0, 0, sy, 0, 0);
+    vctx.clearRect(0, 0, cssW, cssH);
+    vctx.fillStyle = '#143240';
+    vctx.fillRect(0, 0, cssW, cssH);
+    vctx.save();
+    vctx.translate(cssW / 2, cssH / 2);
+    vctx.scale(cam.zoom, cam.zoom);
+    vctx.translate(-cam.cx, -cam.cy);
+    if (layerOn('terrain')) vctx.drawImage(terrainC, 0, 0);
+    if (layerOn('hillshade')) vctx.drawImage(shadeC, 0, 0);
+    if (layerOn('water')) vctx.drawImage(waterC, 0, 0);
+    if (features.regions && layerOn('regions')) vctx.drawImage(regionC, 0, 0);
+    if (features.parchment && layerOn('overlays')) {
+      vctx.save();
+      vctx.globalCompositeOperation = 'multiply';
+      vctx.globalAlpha = 0.55;
+      vctx.drawImage(paperC, 0, 0);
+      vctx.restore();
+    }
+    if (layerOn('water')) {
+      vctx.save();
+      vctx.strokeStyle = '#1c2a30';
+      vctx.lineWidth = 1.35;
+      vctx.lineJoin = 'round';
+      vctx.lineCap = 'round';
+      coastLines.forEach(function (line) { strokePoly(vctx, line); });
+      if (features.ripples) {
+        [5, 10, 16].forEach(function (dist, idx) {
+          vctx.globalAlpha = 0.55 - idx * 0.14;
+          vctx.lineWidth = 1.1 - idx * 0.25;
+          coastLines.forEach(function (line) {
+            if (line.length < 8) return;
+            strokePoly(vctx, offsetLine(line, dist));
+          });
+        });
+        vctx.globalAlpha = 1;
+      }
+      vctx.restore();
+    }
+    if (layerOn('rivers')) {
+      rivers.forEach(function (rv) {
+        const poly = taperRibbon(rv.points, rv.w0, rv.w1);
+        if (!poly) return;
+        vctx.beginPath();
+        vctx.moveTo(poly[0].x, poly[0].y);
+        for (let i = 1; i < poly.length; i++) vctx.lineTo(poly[i].x, poly[i].y);
+        vctx.closePath();
+        vctx.fillStyle = '#3d87a4';
+        vctx.fill();
+        vctx.strokeStyle = '#1d4254';
+        vctx.lineWidth = 0.8;
+        vctx.stroke();
+      });
+    }
+    function drawVectorList(list, color, width) {
+      list.forEach(function (item) {
+        const selected = selection && selection.kind && item.id === selection.id;
+        vctx.save();
+        vctx.strokeStyle = selected ? '#e0b15a' : color;
+        applyStyle(vctx, item.style || 'solid', selected ? width + 1.2 : width);
+        strokePoly(vctx, item.points);
+        vctx.restore();
+      });
+    }
+    if (layerOn('roads')) drawVectorList(roads, '#6a4328', 2.4);
+    if (layerOn('borders')) drawVectorList(borders, '#3a2744', 1.7);
+    if (draft.kind && draft.points.length) {
+      vctx.save();
+      vctx.strokeStyle = '#e0b15a';
+      vctx.fillStyle = '#e0b15a';
+      vctx.lineWidth = 1.4;
+      vctx.setLineDash([4, 3]);
+      if (draft.kind === 'river') {
+        const poly = taperRibbon(draft.points, riverW, Math.max(1.2, riverW * 0.22));
+        if (poly) {
+          vctx.beginPath();
+          vctx.moveTo(poly[0].x, poly[0].y);
+          for (let i = 1; i < poly.length; i++) vctx.lineTo(poly[i].x, poly[i].y);
+          vctx.closePath();
+          vctx.globalAlpha = 0.85;
+          vctx.fillStyle = '#7ec3d6';
+          vctx.fill();
+        }
+      } else {
+        applyStyle(vctx, lineStyle, draft.kind === 'road' ? 2.4 : 1.7);
+        vctx.strokeStyle = '#e0b15a';
+        strokePoly(vctx, draft.points);
+      }
+      vctx.setLineDash([]);
+      draft.points.forEach(function (p) {
+        vctx.beginPath(); vctx.arc(p.x, p.y, 2.2, 0, Math.PI * 2); vctx.fill();
+      });
+      vctx.restore();
+    }
+    if (layerOn('stamps')) {
+      stamps.forEach(function (s) {
+        drawStamp(vctx, s);
+        if (selection && selection.kind === 'stamp' && selection.id === s.id) {
+          vctx.save();
+          vctx.strokeStyle = '#e0b15a';
+          vctx.lineWidth = 1;
+          vctx.beginPath();
+          vctx.arc(s.x, s.y, 18 * (s.size || 1), 0, Math.PI * 2);
+          vctx.stroke();
+          vctx.restore();
+        }
+      });
+    }
+    if (layerOn('labels')) labels.forEach(function (lab) { drawLabel(vctx, lab); });
+    if (features.grid && layerOn('overlays')) drawGrid(vctx);
+    if (features.hex && layerOn('overlays')) drawHex(vctx);
+    vctx.restore();
+    if (features.frame && layerOn('overlays')) drawFrame(vctx, cssW, cssH);
+    if (features.compass && layerOn('overlays')) drawCompass(vctx, cssW, cssH);
+    if (features.scale && layerOn('overlays')) drawScale(vctx, cssW, cssH);
+    drawCount++;
+  }
+
+  function clientToWorld(clientX, clientY) {
+    const r = stage.getBoundingClientRect();
+    return {
+      x: (clientX - r.left - r.width / 2) / cam.zoom + cam.cx,
+      y: (clientY - r.top - r.height / 2) / cam.zoom + cam.cy
+    };
+  }
+  function worldToClient(wx, wy) {
+    const r = stage.getBoundingClientRect();
+    return {
+      x: r.left + r.width / 2 + (wx - cam.cx) * cam.zoom,
+      y: r.top + r.height / 2 + (wy - cam.cy) * cam.zoom
+    };
+  }
+
+  function capture() {
+    return {
+      height: new Float32Array(height),
+      terrain: tctx.getImageData(0, 0, W, H),
+      region: rctx.getImageData(0, 0, W, H),
+      stamps: JSON.parse(JSON.stringify(stamps)),
+      rivers: JSON.parse(JSON.stringify(rivers)),
+      roads: JSON.parse(JSON.stringify(roads)),
+      borders: JSON.parse(JSON.stringify(borders)),
+      labels: JSON.parse(JSON.stringify(labels)),
+      sea: sea
+    };
+  }
+  function restore(snap) {
+    height.set(snap.height);
+    tctx.putImageData(snap.terrain, 0, 0);
+    rctx.putImageData(snap.region, 0, 0);
+    stamps.splice(0, stamps.length); snap.stamps.forEach(function (s) { stamps.push(s); });
+    rivers.splice(0, rivers.length); snap.rivers.forEach(function (s) { rivers.push(s); });
+    roads.splice(0, roads.length); snap.roads.forEach(function (s) { roads.push(s); });
+    borders.splice(0, borders.length); snap.borders.forEach(function (s) { borders.push(s); });
+    labels.splice(0, labels.length); snap.labels.forEach(function (s) { labels.push(s); });
+    sea = snap.sea;
+    seaInput.value = String(sea);
+    seaNum.value = sea.toFixed(3);
+    selection = null;
+    noteIds();
+    rebuildAll();
+    renderContext();
+    updateUndoButtons();
+  }
+  function takeSnapshot() {
+    if (!features.undo) return;
+    undoStack.push(capture());
+    if (undoStack.length > 20) undoStack.shift();
+    redoStack.length = 0;
+    updateUndoButtons();
+  }
+  function undo() {
+    if (!features.undo) { toast('Turn on Undo / redo in Features'); return false; }
+    if (!undoStack.length) { toast('Nothing to undo'); return false; }
+    redoStack.push(capture());
+    restore(undoStack.pop());
+    return true;
+  }
+  function redo() {
+    if (!features.undo) { toast('Turn on Undo / redo in Features'); return false; }
+    if (!redoStack.length) { toast('Nothing to redo'); return false; }
+    undoStack.push(capture());
+    restore(redoStack.pop());
+    return true;
+  }
+  function updateUndoButtons() {
+    const on = features.undo;
+    document.getElementById('undo-btn').setAttribute('aria-disabled', (!on || !undoStack.length) ? 'true' : 'false');
+    document.getElementById('redo-btn').setAttribute('aria-disabled', (!on || !redoStack.length) ? 'true' : 'false');
+  }
+
+  function exportPNG() {
+    if (!features.exportPng) { toast('Turn on Export PNG in Features'); return null; }
+    const scale = 2;
+    const c = document.createElement('canvas');
+    c.width = W * scale; c.height = H * scale;
+    const ctx = c.getContext('2d');
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
+    ctx.fillStyle = '#143240';
+    ctx.fillRect(0, 0, W, H);
+    ctx.drawImage(terrainC, 0, 0);
+    ctx.drawImage(shadeC, 0, 0);
+    ctx.drawImage(waterC, 0, 0);
+    if (features.regions && layerOn('regions')) ctx.drawImage(regionC, 0, 0);
+    if (features.parchment && layerOn('overlays')) {
+      ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = 0.55; ctx.drawImage(paperC, 0, 0); ctx.restore();
+    }
+    ctx.save();
+    ctx.strokeStyle = '#1c2a30'; ctx.lineWidth = 1.35; ctx.lineJoin = 'round';
+    coastLines.forEach(function (line) { strokePoly(ctx, line); });
+    if (features.ripples) {
+      coastLines.forEach(function (line) {
+        if (line.length < 8) return;
+        ctx.globalAlpha = 0.4; strokePoly(ctx, offsetLine(line, 8)); ctx.globalAlpha = 1;
+      });
+    }
+    ctx.restore();
+    rivers.forEach(function (rv) {
+      const poly = taperRibbon(rv.points, rv.w0, rv.w1);
+      if (!poly) return;
+      ctx.beginPath(); ctx.moveTo(poly[0].x, poly[0].y);
+      for (let i = 1; i < poly.length; i++) ctx.lineTo(poly[i].x, poly[i].y);
+      ctx.closePath(); ctx.fillStyle = '#3d87a4'; ctx.fill();
+    });
+    roads.forEach(function (item) { ctx.save(); ctx.strokeStyle = '#6a4328'; applyStyle(ctx, item.style, 2.4); strokePoly(ctx, item.points); ctx.restore(); });
+    borders.forEach(function (item) { ctx.save(); ctx.strokeStyle = '#3a2744'; applyStyle(ctx, item.style, 1.7); strokePoly(ctx, item.points); ctx.restore(); });
+    stamps.forEach(function (s) { drawStamp(ctx, s); });
+    labels.forEach(function (lab) { drawLabel(ctx, lab); });
+    const savedZoom = cam.zoom;
+    cam.zoom = 1;
+    if (features.grid && layerOn('overlays')) drawGrid(ctx);
+    if (features.hex && layerOn('overlays')) drawHex(ctx);
+    if (features.frame && layerOn('overlays')) drawFrame(ctx, W, H);
+    if (features.compass && layerOn('overlays')) drawCompass(ctx, W, H);
+    if (features.scale && layerOn('overlays')) drawScale(ctx, W, H);
+    cam.zoom = savedZoom;
+    let url = null;
+    try { url = c.toDataURL('image/png'); } catch (err) { toast('Export failed'); return null; }
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'landbox-map-' + seed + '.png';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    lastExport = url;
+    toast('Exported PNG');
+    return url;
+  }
+
+  function hitStamp(w) {
+    let best = null, bestD = 1e9;
+    for (let i = 0; i < stamps.length; i++) {
+      const s = stamps[i];
+      const d = Math.hypot(s.x - w.x, s.y - w.y);
+      const rad = 16 * (s.size || 1);
+      if (d < rad && d < bestD) { best = s; bestD = d; }
+    }
+    return best;
+  }
+  function hitLabel(w) {
+    let best = null, bestD = 1e9;
+    for (let i = 0; i < labels.length; i++) {
+      const lab = labels[i];
+      const d = Math.hypot(lab.x - w.x, lab.y - w.y);
+      if (d < Math.max(18, (lab.text || '').length * (lab.size || 14) * 0.28) && d < bestD) { best = lab; bestD = d; }
+    }
+    return best;
+  }
+  function distToPoly(w, points) {
+    let best = 1e9;
+    for (let i = 1; i < points.length; i++) {
+      const a = points[i - 1], b = points[i];
+      const dx = b.x - a.x, dy = b.y - a.y;
+      const l2 = dx * dx + dy * dy || 1;
+      let t = ((w.x - a.x) * dx + (w.y - a.y) * dy) / l2;
+      t = clamp(t, 0, 1);
+      best = Math.min(best, Math.hypot(a.x + dx * t - w.x, a.y + dy * t - w.y));
+    }
+    return best;
+  }
+  function hitLine(list, w) {
+    let best = null, bestD = 10;
+    for (let i = 0; i < list.length; i++) {
+      const d = distToPoly(w, list[i].points);
+      if (d < bestD) { best = list[i]; bestD = d; }
+    }
+    return best;
+  }
+
+  let gesture = null;
+  let lastW = { x: 0, y: 0 };
+  let downW = { x: 0, y: 0 };
+  let moved = false;
+  let sculptTimer = 0;
+  let coastClock = 0;
+  let pendingSnap = false;
+  let liveRight = false, liveShift = false, liveCtrl = false, liveAlt = false, liveMeta = false;
+  const pointers = new Map();
+  let pinch = null;
+  let repeatTimer = 0;
+
+  function currentSculptSign() {
+    if (liveRight) return (liveShift || liveCtrl || liveAlt || liveMeta) ? -1 : 1;
+    if (tool === 'lower' || sculptMode === 'lower') return -1;
+    return 1;
+  }
+  function sculptAt(x, y, sign) {
+    const power = 0.16 * sign;
+    const rect = forBrush(x, y, brush, function (px, py, fall) {
+      const i = py * W + px;
+      height[i] = clamp(height[i] + power * fall, 0, 1);
+    });
+    rebuildShade(rect.x0 - 2, rect.y0 - 2, rect.x1 + 2, rect.y1 + 2);
+    rebuildWater(rect.x0 - 2, rect.y0 - 2, rect.x1 + 2, rect.y1 + 2);
+    const now = performance.now();
+    if (now - coastClock > 240) { coastClock = now; buildCoast(); }
+    dirty = true;
+  }
+  function segmentDo(a, b, fn) {
+    const dist = Math.hypot(b.x - a.x, b.y - a.y);
+    const step = Math.max(1, brush * 0.28);
+    const n = Math.max(1, Math.ceil(dist / step));
+    for (let i = 0; i <= n; i++) {
+      const t = i / n;
+      fn(a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t);
+    }
+  }
+  function endSculpt() {
+    clearInterval(sculptTimer);
+    sculptTimer = 0;
+    buildCoast();
+    dirty = true;
+  }
+
+  function onPointerDown(e) {
+    if (e.button > 2) return;
+    if (e.button === 1) return;
+    try { stage.setPointerCapture(e.pointerId); } catch (err) { /* synthetic test events */ }
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    liveShift = e.shiftKey; liveCtrl = e.ctrlKey; liveAlt = e.altKey; liveMeta = e.metaKey;
+    if (pointers.size >= 2) {
+      endGesture();
+      gesture = 'pinch';
+      pinch = readPinch();
+      return;
+    }
+    const w = clientToWorld(e.clientX, e.clientY);
+    lastW = w; downW = w; moved = false;
+    if (e.button === 2) {
+      liveRight = true;
+      startSculpt(w);
+      e.preventDefault();
+      return;
+    }
+    if (tool === 'raise' || tool === 'lower') { startSculpt(w); return; }
+    if (tool === 'paint') { gesture = 'paint'; takeSnapshot(); paintTerrainDisk(w.x, w.y, TERRAIN[terrainName].color, brush); dirty = true; return; }
+    if (tool === 'region') { gesture = 'region'; takeSnapshot(); paintRegionDisk(w.x, w.y, regionColor, brush); dirty = true; return; }
+    if (tool === 'scatter') { startScatter(w); return; }
+    if (tool === 'pan') { gesture = 'pan'; return; }
+    if (tool === 'stamp') { startStamp(w); return; }
+    if (tool === 'label') { startLabel(w); return; }
+    if (tool === 'river' || tool === 'road' || tool === 'border') { gesture = 'line'; return; }
+  }
+  function startSculpt(w) {
+    gesture = 'sculpt';
+    takeSnapshot();
+    sculptAt(w.x, w.y, currentSculptSign());
+    clearInterval(sculptTimer);
+    sculptTimer = setInterval(function () {
+      if (gesture !== 'sculpt') return;
+      sculptAt(lastW.x, lastW.y, currentSculptSign());
+    }, 45);
+  }
+  function startScatter(w) {
+    if (!features.scatter) { toast('Turn on Symbol scatter brush in Features'); gesture = null; return; }
+    gesture = 'scatter';
+    takeSnapshot();
+    dropScatter(w.x, w.y, true);
+  }
+  let lastScatter = { x: -999, y: -999 };
+  function dropScatter(x, y, force) {
+    if (!force && Math.hypot(x - lastScatter.x, y - lastScatter.y) < brush * 0.75) return;
+    lastScatter = { x: x, y: y };
+    const kinds = scatterKind === 'trees' ? ['trees'] : scatterKind === 'hills' ? ['hill', 'mountain'] : ['trees', 'trees', 'hill', 'mountain'];
+    const type = kinds[Math.floor(Math.random() * kinds.length)];
+    stamps.push({
+      id: uid(), type: type,
+      x: x + (Math.random() - 0.5) * brush * 0.8,
+      y: y + (Math.random() - 0.5) * brush * 0.8,
+      size: 0.65 + Math.random() * 0.55,
+      rot: Math.random() * Math.PI * 2,
+      color: ink
+    });
+    dirty = true;
+  }
+  function startStamp(w) {
+    const hit = hitStamp(w);
+    if (hit) {
+      gesture = 'move-stamp';
+      selection = { kind: 'stamp', id: hit.id };
+      pendingSnap = true;
+      renderContext();
+      dirty = true;
+    } else {
+      gesture = 'place-stamp';
+    }
+  }
+  function startLabel(w) {
+    const hit = hitLabel(w);
+    if (hit) {
+      gesture = 'move-label';
+      selection = { kind: 'label', id: hit.id };
+      pendingSnap = true;
+      renderContext();
+      dirty = true;
+    } else {
+      gesture = 'place-label';
+    }
+  }
+  function onPointerMove(e) {
+    if (!pointers.has(e.pointerId)) return;
+    const prev = pointers.get(e.pointerId);
+    pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    liveShift = e.shiftKey; liveCtrl = e.ctrlKey; liveAlt = e.altKey; liveMeta = e.metaKey;
+    if (gesture === 'pinch' && pointers.size >= 2) { applyPinch(); return; }
+    const w = clientToWorld(e.clientX, e.clientY);
+    if (Math.hypot(w.x - downW.x, w.y - downW.y) > 2) moved = true;
+    if (gesture === 'sculpt') lastW = w;
+    else if (gesture === 'paint') { segmentDo(lastW, w, function (x, y) { paintTerrainDisk(x, y, TERRAIN[terrainName].color, brush); }); dirty = true; lastW = w; }
+    else if (gesture === 'region') { segmentDo(lastW, w, function (x, y) { paintRegionDisk(x, y, regionColor, brush); }); dirty = true; lastW = w; }
+    else if (gesture === 'scatter') { segmentDo(lastW, w, function (x, y) { dropScatter(x, y, false); }); lastW = w; }
+    else if (gesture === 'pan') {
+      cam.cx -= (e.clientX - prev.x) / cam.zoom;
+      cam.cy -= (e.clientY - prev.y) / cam.zoom;
+      dirty = true;
+    } else if (gesture === 'move-stamp' || gesture === 'move-label') {
+      if (pendingSnap) { takeSnapshot(); pendingSnap = false; }
+      const list = gesture === 'move-stamp' ? stamps : labels;
+      const obj = list.find(function (o) { return o.id === selection.id; });
+      if (obj) { obj.x += w.x - lastW.x; obj.y += w.y - lastW.y; dirty = true; }
+      lastW = w;
+    } else lastW = w;
+  }
+  function onPointerUp(e) {
+    pointers.delete(e.pointerId);
+    if (gesture === 'pinch') {
+      if (pointers.size < 2) { gesture = null; pinch = null; }
+      return;
+    }
+    const w = clientToWorld(e.clientX, e.clientY);
+    if (gesture === 'sculpt') endSculpt();
+    else if (gesture === 'place-stamp' && !moved) {
+      takeSnapshot();
+      const s = { id: uid(), type: stampType, x: w.x, y: w.y, size: 1, rot: stampRot, color: ink };
+      stamps.push(s);
+      selection = { kind: 'stamp', id: s.id };
+      renderContext();
+      dirty = true;
+    } else if (gesture === 'place-label' && !moved) {
+      takeSnapshot();
+      const lab = { id: uid(), text: 'New place', x: w.x, y: w.y, size: 15, curve: false, italic: false };
+      labels.push(lab);
+      selection = { kind: 'label', id: lab.id };
+      renderContext();
+      dirty = true;
+      setTimeout(function () { const el = document.getElementById('label-text'); if (el) el.focus(); }, 0);
+    } else if (gesture === 'line' && !moved) lineTap(w);
+    else if (gesture === 'move-stamp' || gesture === 'move-label') pendingSnap = false;
+    if (e.button === 2) liveRight = false;
+    if (pointers.size === 0 && gesture !== 'pinch') gesture = null;
+  }
+  function endGesture() {
+    if (gesture === 'sculpt') endSculpt();
+    gesture = null;
+    pendingSnap = false;
+  }
+  function lineTap(w) {
+    const list = tool === 'river' ? rivers : tool === 'road' ? roads : borders;
+    if (!draft.points.length) {
+      const hit = hitLine(list, w);
+      if (hit) {
+        selection = { kind: tool, id: hit.id };
+        renderContext();
+        dirty = true;
+        return;
+      }
+    }
+    if (!draft.kind) draft = { kind: tool, points: [] };
+    if (draft.kind !== tool) draft = { kind: tool, points: [] };
+    draft.points.push({ x: w.x, y: w.y });
+    renderContext();
+    dirty = true;
+  }
+  function commitDraft() {
+    if (!draft.points || draft.points.length < 2) { toast('Add at least two points'); return; }
+    takeSnapshot();
+    if (draft.kind === 'river') rivers.push({ id: uid(), points: draft.points.slice(), w0: riverW, w1: Math.max(1.1, riverW * 0.18) });
+    else if (draft.kind === 'road') roads.push({ id: uid(), points: draft.points.slice(), style: lineStyle });
+    else if (draft.kind === 'border') borders.push({ id: uid(), points: draft.points.slice(), style: lineStyle });
+    draft = { kind: null, points: [] };
+    renderContext();
+    dirty = true;
+  }
+  function readPinch() {
+    const pts = Array.from(pointers.values());
+    if (pts.length < 2) return null;
+    return {
+      dist: Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1,
+      mx: (pts[0].x + pts[1].x) / 2,
+      my: (pts[0].y + pts[1].y) / 2,
+      zoom: cam.zoom,
+      cx: cam.cx,
+      cy: cam.cy
+    };
+  }
+  function applyPinch() {
+    const now = readPinch();
+    if (!now || !pinch) return;
+    cam.zoom = clamp(pinch.zoom * (now.dist / pinch.dist), 0.35, 8);
+    cam.cx = pinch.cx - (now.mx - pinch.mx) / cam.zoom;
+    cam.cy = pinch.cy - (now.my - pinch.my) / cam.zoom;
+    dirty = true;
+  }
+
+  function selectedObject() {
+    if (!selection) return null;
+    const lists = { stamp: stamps, label: labels, river: rivers, road: roads, border: borders };
+    const list = lists[selection.kind];
+    if (!list) return null;
+    return list.find(function (o) { return o.id === selection.id; }) || null;
+  }
+  function deleteSelection() {
+    if (!selection) { toast('Nothing selected'); return; }
+    takeSnapshot();
+    const lists = { stamp: stamps, label: labels, river: rivers, road: roads, border: borders };
+    const list = lists[selection.kind];
+    if (!list) return;
+    const idx = list.findIndex(function (o) { return o.id === selection.id; });
+    if (idx >= 0) list.splice(idx, 1);
+    selection = null;
+    renderContext();
+    dirty = true;
+  }
+
+  function renderContext() {
+    const parts = [];
+    if (tool === 'paint') {
+      Object.keys(TERRAIN).forEach(function (key) {
+        const t = TERRAIN[key];
+        parts.push('<button type="button" class="swatch" data-terrain="' + key + '" aria-label="' + t.name + '" aria-pressed="' + (terrainName === key ? 'true' : 'false') + '" style="background:' + t.color + '"></button>');
+      });
+      parts.push(brushField());
+    } else if (tool === 'stamp') {
+      STAMP_TYPES.forEach(function (type) {
+        parts.push('<button type="button" class="stamp-btn" data-stamp="' + type + '" aria-label="' + type + '" aria-pressed="' + (stampType === type ? 'true' : 'false') + '"><canvas width="64" height="64" data-preview="' + type + '"></canvas></button>');
+      });
+      INKS.forEach(function (c, i) {
+        parts.push('<button type="button" class="ink-btn" data-ink="' + c + '" aria-label="Ink ' + (i + 1) + '" aria-pressed="' + (ink === c ? 'true' : 'false') + '" style="background:' + c + '"></button>');
+      });
+      parts.push('<button type="button" id="entity-delete">Delete</button>');
+    } else if (tool === 'raise' || tool === 'lower') {
+      parts.push('<button type="button" class="sculpt-btn" id="sculpt-raise" aria-pressed="' + (sculptMode !== 'lower' ? 'true' : 'false') + '">Raise</button>');
+      parts.push('<button type="button" class="sculpt-btn" id="sculpt-lower" aria-pressed="' + (sculptMode === 'lower' ? 'true' : 'false') + '">Lower</button>');
+      parts.push(brushField());
+    } else if (tool === 'river' || tool === 'road' || tool === 'border') {
+      if (tool !== 'river') {
+        ['solid', 'dashed', 'dotted'].forEach(function (st) {
+          parts.push('<button type="button" class="style-btn" data-style="' + st + '" aria-pressed="' + (lineStyle === st ? 'true' : 'false') + '">' + st + '</button>');
+        });
+      } else {
+        parts.push('<label class="field">Width <input id="river-w" type="range" min="3" max="16" step="0.5" value="' + riverW + '"></label>');
+      }
+      parts.push('<button type="button" id="line-back">Back</button>');
+      parts.push('<button type="button" id="line-done">Done</button>');
+      parts.push('<button type="button" id="entity-delete">Delete</button>');
+    } else if (tool === 'label') {
+      const lab = selection && selection.kind === 'label' ? selectedObject() : null;
+      const text = lab ? escapeAttr(lab.text) : '';
+      parts.push('<input id="label-text" aria-label="Place name" value="' + text + '" placeholder="Place name">');
+      parts.push('<label class="field"><input id="label-curve" type="checkbox" ' + (lab && lab.curve ? 'checked' : '') + '> Curved</label>');
+      parts.push('<button type="button" id="entity-delete">Delete</button>');
+    } else if (tool === 'region') {
+      REGION_COLORS.forEach(function (c) {
+        parts.push('<button type="button" class="swatch" data-region="' + c + '" aria-label="Realm ' + c + '" aria-pressed="' + (regionColor === c ? 'true' : 'false') + '" style="background:' + c + '"></button>');
+      });
+      parts.push(brushField());
+    } else if (tool === 'scatter') {
+      [['mixed', 'Mixed'], ['trees', 'Trees'], ['hills', 'Hills']].forEach(function (pair) {
+        parts.push('<button type="button" class="style-btn" data-scatter="' + pair[0] + '" aria-pressed="' + (scatterKind === pair[0] ? 'true' : 'false') + '">' + pair[1] + '</button>');
+      });
+      parts.push(brushField());
+    } else if (tool === 'pan') {
+      parts.push('<span class="field">Drag the map, or hold W A S D.</span>');
+    }
+    contextEl.innerHTML = parts.join('');
+    contextEl.querySelectorAll('canvas[data-preview]').forEach(function (cv) {
+      const ctx = cv.getContext('2d');
+      ctx.translate(32, 32);
+      ctx.scale(1.35, 1.35);
+      ctx.fillStyle = '#241910';
+      ctx.strokeStyle = '#241910';
+      drawStampIcon(ctx, cv.getAttribute('data-preview'));
+    });
+    if (tool === 'paint') setHint('Painting ' + TERRAIN[terrainName].name.toLowerCase() + '. Right-click raises land. Shift, Ctrl, or Alt with right-click lowers it.');
+    else setHint(HINTS[tool] || HINTS.paint);
+    document.body.dataset.tool = tool;
+  }
+  function brushField() {
+    return '<label class="field">Size <input id="brush" type="range" min="6" max="64" step="1" value="' + brush + '"></label>';
+  }
+  function escapeAttr(s) {
+    return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  }
+  function renderHotbar() {
+    hotbarEl.innerHTML = slots.map(function (slot) {
+      const active = !CONTINUOUS.has(slot.action) && slot.action === tool;
+      const name = ACTION_NAME[slot.action] || slot.action;
+      return '<button type="button" class="slot" data-slot="' + slot.key + '" data-action="' + slot.action + '" aria-pressed="' + (active ? 'true' : 'false') + '" aria-label="Slot ' + slot.key.toUpperCase() + ' ' + name + '"><span class="k">' + slot.key.toUpperCase() + '</span><span class="a">' + name + '</span></button>';
+    }).join('');
+  }
+
+  function openSheet(kind) {
+    sheetKind = kind;
+    sheet.hidden = false;
+  }
+  function closeSheet() {
+    sheet.hidden = true;
+    sheetKind = null;
+  }
+  function renderFeatures() {
+    sheetTitle.textContent = 'Features';
+    sheetBody.innerHTML = FEATURE_LIST.map(function (f) {
+      const on = features[f.id] ? 'true' : 'false';
+      return '<button type="button" class="toggle" role="switch" data-feature="' + f.id + '" aria-checked="' + on + '"><span><b>' + f.name + '</b><small>' + f.detail + '</small></span><i class="knob" aria-hidden="true"></i></button>';
+    }).join('');
+    openSheet('features');
+  }
+  function renderLayers() {
+    sheetTitle.textContent = 'Layers';
+    sheetBody.innerHTML = '<p class="field">Hidden layers stay in the map. Turn Layers off in Features to show everything.</p>' + LAYER_LIST.map(function (l) {
+      const on = layers[l[0]] !== false ? 'true' : 'false';
+      return '<button type="button" class="toggle" role="switch" data-layer="' + l[0] + '" aria-checked="' + on + '"><span><b>' + l[1] + '</b></span><i class="knob" aria-hidden="true"></i></button>';
+    }).join('');
+    openSheet('layers');
+  }
+  function renderPicker() {
+    sheetTitle.textContent = pendingSlot ? ('Assign ' + pendingSlot.toUpperCase()) : 'Pick an action';
+    const current = pendingSlot ? slots.find(function (s) { return s.key === pendingSlot; }) : null;
+    sheetBody.innerHTML = ACTIONS.map(function (a) {
+      const on = current && current.action === a[0];
+      return '<button type="button" class="assign" data-assign="' + a[0] + '" aria-pressed="' + (on ? 'true' : 'false') + '">' + a[1] + '</button>';
+    }).join('') + '<p class="field">Defaults: 1 paint, 2 stamp, 3 raise, 4 river, 5 label, 6 border, 7 road, 8 region, 9 scatter. W A S D pan. Q and E zoom. Bindings reset when you leave this page.</p>';
+    openSheet('picker');
+  }
+
+  function setTool(name) {
+    if (name === 'raise' || name === 'lower') {
+      sculptMode = name === 'lower' ? 'lower' : 'raise';
+      tool = sculptMode === 'lower' ? 'lower' : 'raise';
+    } else tool = name;
+    if (draft.kind && draft.kind !== tool) draft = { kind: null, points: [] };
+    renderContext();
+    renderHotbar();
+  }
+  function runAction(action) {
+    if (action === 'raise' || action === 'lower') { setSculpt(action); return; }
+    if (['paint', 'stamp', 'river', 'label', 'border', 'road', 'region', 'scatter', 'pan'].indexOf(action) >= 0) { setTool(action); return; }
+    if (action === 'zoomIn') { cam.zoom = clamp(cam.zoom * 1.12, 0.35, 8); dirty = true; return; }
+    if (action === 'zoomOut') { cam.zoom = clamp(cam.zoom / 1.12, 0.35, 8); dirty = true; return; }
+    if (PAN[action]) { held.add(action); return; }
+    if (action === 'undo') { undo(); return; }
+    if (action === 'redo') { redo(); return; }
+    if (action === 'generate') { doGenerate(); return; }
+    if (action === 'export') { exportPNG(); return; }
+    if (action === 'rotate') {
+      stampRot += Math.PI / 12;
+      const obj = selectedObject();
+      if (obj && selection.kind === 'stamp') { obj.rot = (obj.rot || 0) + Math.PI / 12; dirty = true; }
+      return;
+    }
+    if (action === 'brushUp') { brush = clamp(brush + 4, 6, 64); renderContext(); return; }
+    if (action === 'brushDown') { brush = clamp(brush - 4, 6, 64); renderContext(); return; }
+    if (action === 'features') { renderFeatures(); return; }
+    if (action === 'seaUp') { setSea(sea + 0.01); return; }
+    if (action === 'seaDown') { setSea(sea - 0.01); return; }
+  }
+  function setSculpt(mode) {
+    sculptMode = mode === 'lower' ? 'lower' : 'raise';
+    tool = sculptMode === 'lower' ? 'lower' : 'raise';
+    renderContext();
+    renderHotbar();
+  }
+  function setSea(v) {
+    const n = Number(v);
+    if (n !== n) return;
+    sea = clamp(n, 0.15, 0.75);
+    seaInput.value = String(sea);
+    seaNum.value = sea.toFixed(3);
+    rebuildWater(0, 0, W, H);
+    buildCoast();
+    dirty = true;
+  }
+  function doGenerate() {
+    const n = Number(seedInput.value);
+    if (seedInput.value.trim() === '' || n !== n) { toast('Type a seed number'); return; }
+    takeSnapshot();
+    generate(n, lat, lon);
+    didFit = false;
+    resize();
+  }
+
+  function slotByKey(k) { return slots.find(function (s) { return s.key === k; }); }
+
+  contextEl.addEventListener('click', function (e) {
+    const t = e.target.closest('button');
+    if (!t) return;
+    if (t.dataset.terrain) { terrainName = t.dataset.terrain; renderContext(); }
+    else if (t.dataset.stamp) { stampType = t.dataset.stamp; renderContext(); }
+    else if (t.dataset.ink) { ink = t.dataset.ink; const obj = selectedObject(); if (obj && selection.kind === 'stamp') { obj.color = ink; dirty = true; } renderContext(); }
+    else if (t.dataset.style) { lineStyle = t.dataset.style; renderContext(); }
+    else if (t.dataset.region) { regionColor = t.dataset.region; renderContext(); }
+    else if (t.dataset.scatter) { scatterKind = t.dataset.scatter; renderContext(); }
+    else if (t.id === 'sculpt-raise') setSculpt('raise');
+    else if (t.id === 'sculpt-lower') setSculpt('lower');
+    else if (t.id === 'line-done') commitDraft();
+    else if (t.id === 'line-back') { draft.points.pop(); if (!draft.points.length) draft.kind = null; renderContext(); dirty = true; }
+    else if (t.id === 'entity-delete') deleteSelection();
+  });
+  contextEl.addEventListener('input', function (e) {
+    if (e.target.id === 'brush') brush = Number(e.target.value);
+    else if (e.target.id === 'river-w') riverW = Number(e.target.value);
+    else if (e.target.id === 'label-text') {
+      const lab = selectedObject();
+      if (lab && selection.kind === 'label') { lab.text = e.target.value; dirty = true; }
+    } else if (e.target.id === 'label-curve') {
+      const lab = selectedObject();
+      if (lab && selection.kind === 'label') { lab.curve = e.target.checked; dirty = true; }
+    }
+  });
+  contextEl.addEventListener('change', function (e) {
+    if (e.target.id === 'label-curve') {
+      const lab = selectedObject();
+      if (lab) { lab.curve = e.target.checked; dirty = true; }
+    }
+  });
+
+  hotbarEl.addEventListener('pointerdown', function (e) {
+    const btn = e.target.closest('[data-slot]');
+    if (!btn) return;
+    if (rebindMode) { pendingSlot = btn.dataset.slot; renderPicker(); return; }
+    const slot = slotByKey(btn.dataset.slot);
+    if (!slot) return;
+    if (CONTINUOUS.has(slot.action) || PAN[slot.action]) {
+      e.preventDefault();
+      startRepeat(slot.action);
+    }
+  });
+  hotbarEl.addEventListener('click', function (e) {
+    const btn = e.target.closest('[data-slot]');
+    if (!btn || rebindMode) return;
+    const slot = slotByKey(btn.dataset.slot);
+    if (!slot || CONTINUOUS.has(slot.action) || PAN[slot.action]) return;
+    runAction(slot.action);
+  });
+  const buttonHeld = new Set();
+  function startRepeat(action) {
+    clearInterval(repeatTimer);
+    if (PAN[action]) {
+      buttonHeld.add(action);
+      held.add(action);
+      return;
+    }
+    runAction(action);
+    repeatTimer = setInterval(function () { runAction(action); }, 80);
+  }
+  function releasePointerRepeats() {
+    clearInterval(repeatTimer);
+    buttonHeld.forEach(function (action) { held.delete(action); });
+    buttonHeld.clear();
+  }
+  window.addEventListener('pointerup', releasePointerRepeats);
+  window.addEventListener('pointercancel', releasePointerRepeats);
+
+  document.getElementById('regen').addEventListener('click', doGenerate);
+  document.getElementById('features-btn').addEventListener('click', function () {
+    if (sheetKind === 'features' && !sheet.hidden) closeSheet(); else renderFeatures();
+  });
+  document.getElementById('layers-btn').addEventListener('click', function () {
+    if (!features.layers) { toast('Turn on Layers in Features'); return; }
+    if (sheetKind === 'layers' && !sheet.hidden) closeSheet(); else renderLayers();
+  });
+  document.getElementById('undo-btn').addEventListener('click', function () { undo(); });
+  document.getElementById('redo-btn').addEventListener('click', function () { redo(); });
+  document.getElementById('export-btn').addEventListener('click', function () { exportPNG(); });
+  document.getElementById('rebind').addEventListener('click', function () {
+    rebindMode = !rebindMode;
+    document.getElementById('rebind').setAttribute('aria-pressed', rebindMode ? 'true' : 'false');
+    setHint(rebindMode ? 'Tap a hotbar slot, then pick an action. Bindings reset when you leave.' : (HINTS[tool] || ''));
+    if (!rebindMode) closeSheet();
+  });
+  document.getElementById('sheet-close').addEventListener('click', closeSheet);
+  sheetBody.addEventListener('click', function (e) {
+    const feat = e.target.closest('[data-feature]');
+    if (feat) {
+      const id = feat.dataset.feature;
+      features[id] = !features[id];
+      feat.setAttribute('aria-checked', features[id] ? 'true' : 'false');
+      if (id === 'undo') updateUndoButtons();
+      dirty = true;
+      return;
+    }
+    const layerBtn = e.target.closest('[data-layer]');
+    if (layerBtn) {
+      const id = layerBtn.dataset.layer;
+      layers[id] = !layers[id];
+      layerBtn.setAttribute('aria-checked', layers[id] ? 'true' : 'false');
+      dirty = true;
+      return;
+    }
+    const assign = e.target.closest('[data-assign]');
+    if (assign && pendingSlot) {
+      const slot = slotByKey(pendingSlot);
+      if (slot) slot.action = assign.dataset.assign;
+      renderHotbar();
+      renderPicker();
+    }
+  });
+
+  let seaSnap = false;
+  seaInput.addEventListener('pointerdown', function () { if (!seaSnap) { takeSnapshot(); seaSnap = true; } });
+  seaInput.addEventListener('input', function () { setSea(seaInput.value); });
+  seaInput.addEventListener('change', function () { seaSnap = false; setSea(seaInput.value); });
+  seaNum.addEventListener('focus', function () { takeSnapshot(); });
+  seaNum.addEventListener('input', function () { setSea(seaNum.value); });
+  seedInput.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); doGenerate(); }
+  });
+
+  stage.addEventListener('pointerdown', onPointerDown);
+  stage.addEventListener('pointermove', onPointerMove);
+  stage.addEventListener('pointerup', onPointerUp);
+  stage.addEventListener('pointercancel', onPointerUp);
+  stage.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+  stage.addEventListener('wheel', function (e) {
+    e.preventDefault();
+    const w = clientToWorld(e.clientX, e.clientY);
+    const factor = e.deltaY > 0 ? 0.92 : 1.08;
+    const next = clamp(cam.zoom * factor, 0.35, 8);
+    cam.cx = w.x - (w.x - cam.cx) * (cam.zoom / next);
+    cam.cy = w.y - (w.y - cam.cy) * (cam.zoom / next);
+    cam.zoom = next;
+    dirty = true;
+  }, { passive: false });
+
+  window.addEventListener('keydown', function (e) {
+    if (e.key === 'Shift') liveShift = true;
+    if (e.key === 'Control') liveCtrl = true;
+    if (e.key === 'Alt') liveAlt = true;
+    if (e.key === 'Meta') liveMeta = true;
+    if (e.key === 'Escape') { closeSheet(); return; }
+    if (e.target && e.target.closest && e.target.closest('input, textarea')) return;
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    const slot = slotByKey(e.key.toLowerCase());
+    if (!slot) return;
+    const action = slot.action;
+    if (PAN[action]) {
+      if (!e.repeat) held.add(action);
+      e.preventDefault();
+      return;
+    }
+    if (e.repeat && !CONTINUOUS.has(action)) return;
+    runAction(action);
+    e.preventDefault();
+  });
+  window.addEventListener('keyup', function (e) {
+    if (e.key === 'Shift') liveShift = false;
+    if (e.key === 'Control') liveCtrl = false;
+    if (e.key === 'Alt') liveAlt = false;
+    if (e.key === 'Meta') liveMeta = false;
+    const slot = slotByKey((e.key || '').toLowerCase());
+    if (slot && PAN[slot.action]) held.delete(slot.action);
+    if (!e.key || e.key === 'Meta' || e.key === 'Control' || e.key === 'Alt' || e.key === 'Shift') {
+      /* modifiers */
+    }
+  });
+  window.addEventListener('blur', function () { held.clear(); clearInterval(repeatTimer); });
+
+  function frame() {
+    let dx = 0, dy = 0;
+    if (held.has('panLeft')) dx -= 1;
+    if (held.has('panRight')) dx += 1;
+    if (held.has('panUp')) dy -= 1;
+    if (held.has('panDown')) dy += 1;
+    if (dx || dy) {
+      const sp = 9 / cam.zoom;
+      cam.cx += dx * sp;
+      cam.cy += dy * sp;
+      dirty = true;
+    }
+    if (dirty) { dirty = false; draw(); }
+    requestAnimationFrame(frame);
+  }
+
+  function resize() {
+    const r = stage.getBoundingClientRect();
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const w = Math.max(1, Math.round(r.width * dpr));
+    const h = Math.max(1, Math.round(r.height * dpr));
+    if (view.width !== w || view.height !== h) { view.width = w; view.height = h; }
+    if (!didFit && r.width > 20 && r.height > 20) {
+      cam.zoom = Math.min(r.width / W, r.height / H) * 0.98;
+      cam.cx = W / 2; cam.cy = H / 2;
+      didFit = true;
+    }
+    dirty = true;
+  }
+  if (window.ResizeObserver) new ResizeObserver(resize).observe(stage);
+  window.addEventListener('resize', resize);
+
+  function findLand() {
+    for (let y = 8; y < H - 8; y += 4) {
+      for (let x = 8; x < W - 8; x += 4) {
+        if (height[y * W + x] > sea + 0.05) return { x: x, y: y };
+      }
+    }
+    return { x: W / 2, y: H / 2 };
+  }
+
+  const MOCK_BAR_VERSION = 'Mock bar v2.2';
+  const MOCK_CHIP_BG_ALPHA = 0.3;
+  const theme = { bg: { base: '#2a241c' } };
+  function mockBgAlpha(css, a) {
+    const m = /^#([0-9a-f]{6})$/i.exec(css || '');
+    if (!m) return 'rgba(128,128,128,' + a + ')';
+    const n = parseInt(m[1], 16);
+    return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
+  }
+  document.documentElement.style.setProperty('--mock-rest', mockBgAlpha(theme.bg.base, MOCK_CHIP_BG_ALPHA));
+  document.documentElement.style.setProperty('--mock-solid', theme.bg.base);
+  (function installMarks() {
+    const HL = { y: '#e2b100', g: '#2f9e44', r: '#e03131' };
+    const markLayer = document.getElementById('mark-layer');
+    const markCanvas = document.getElementById('mark-canvas');
+    const mctx = markCanvas.getContext('2d');
+    const swatches = Array.from(document.querySelectorAll('.mock-swatch'));
+    let hlColor = null;
+    const marks = [];
+    let drawing = null;
+    function syncHl() {
+      swatches.forEach(function (s) { s.setAttribute('aria-pressed', s.dataset.color === hlColor ? 'true' : 'false'); });
+      markLayer.style.pointerEvents = hlColor == null ? 'none' : 'auto';
+      markLayer.classList.toggle('is-live', hlColor != null);
+    }
+    function sizeMark() {
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      markCanvas.width = Math.round(window.innerWidth * dpr);
+      markCanvas.height = Math.round(window.innerHeight * dpr);
+      paintMarks();
+    }
+    function paintMarks() {
+      const dpr = markCanvas.width / Math.max(1, window.innerWidth);
+      mctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      mctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+      const all = drawing ? marks.concat([drawing]) : marks;
+      markLayer.querySelectorAll('.mark-num').forEach(function (n) { n.remove(); });
+      all.forEach(function (mark) {
+        mctx.strokeStyle = HL[mark.color] || '#e2b100';
+        mctx.fillStyle = HL[mark.color] || '#e2b100';
+        mctx.lineWidth = 3;
+        mctx.lineJoin = 'round';
+        mctx.lineCap = 'round';
+        if (mark.pts.length < 2) {
+          mctx.beginPath();
+          mctx.arc(mark.pts[0].x, mark.pts[0].y, 8, 0, Math.PI * 2);
+          mctx.globalAlpha = 0.9;
+          mctx.fill();
+          mctx.globalAlpha = 1;
+        } else {
+          mctx.beginPath();
+          mctx.moveTo(mark.pts[0].x, mark.pts[0].y);
+          for (let i = 1; i < mark.pts.length; i++) mctx.lineTo(mark.pts[i].x, mark.pts[i].y);
+          mctx.stroke();
+        }
+        const badge = document.createElement('span');
+        badge.className = 'mark-num';
+        badge.textContent = String(mark.n);
+        badge.style.left = mark.pts[0].x + 'px';
+        badge.style.top = mark.pts[0].y + 'px';
+        badge.style.color = HL[mark.color];
+        markLayer.appendChild(badge);
+      });
+    }
+    swatches.forEach(function (s) {
+      s.addEventListener('click', function () {
+        hlColor = hlColor === s.dataset.color ? null : s.dataset.color;
+        syncHl();
+      });
+    });
+    document.getElementById('mock-numbers').addEventListener('click', function () {
+      const on = markLayer.classList.toggle('numbers-off');
+      this.setAttribute('aria-pressed', on ? 'false' : 'true');
+    });
+    document.getElementById('mock-dev').addEventListener('click', function () {
+      const panel = document.getElementById('mock-dev-panel');
+      panel.hidden = !panel.hidden;
+      this.setAttribute('aria-expanded', panel.hidden ? 'false' : 'true');
+    });
+    document.getElementById('mock-guides').addEventListener('click', function () {
+      const on = document.body.classList.toggle('mock-guides');
+      this.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    document.getElementById('mock-marks').addEventListener('click', function () {
+      const hidden = markLayer.classList.toggle('marks-off');
+      this.setAttribute('aria-pressed', hidden ? 'false' : 'true');
+    });
+    markLayer.addEventListener('pointerdown', function (e) {
+      if (hlColor == null) return;
+      markLayer.setPointerCapture(e.pointerId);
+      drawing = { color: hlColor, pts: [{ x: e.clientX, y: e.clientY }], n: marks.length + 1 };
+      paintMarks();
+    });
+    markLayer.addEventListener('pointermove', function (e) {
+      if (!drawing) return;
+      drawing.pts.push({ x: e.clientX, y: e.clientY });
+      paintMarks();
+    });
+    function finishMark() {
+      if (!drawing) return;
+      marks.push(drawing);
+      drawing = null;
+      paintMarks();
+    }
+    markLayer.addEventListener('pointerup', finishMark);
+    markLayer.addEventListener('pointercancel', finishMark);
+    window.addEventListener('resize', sizeMark);
+    sizeMark();
+    syncHl();
+    document.getElementById('mock-bar').dataset.version = MOCK_BAR_VERSION;
+  })();
+
+  window.LB = {
+    version: 'landbox-mapmaker-standalone-v1',
+    W: W, H: H,
+    get seed() { return seed; },
+    get lat() { return lat; },
+    get lon() { return lon; },
+    get tool() { return tool; },
+    get sea() { return sea; },
+    get brush() { return brush; },
+    get cam() { return cam; },
+    get features() { return features; },
+    get layers() { return layers; },
+    get stamps() { return stamps; },
+    get rivers() { return rivers; },
+    get roads() { return roads; },
+    get borders() { return borders; },
+    get labels() { return labels; },
+    get stats() { return genStats; },
+    get coastCount() { return coastLines.length; },
+    get drawCount() { return drawCount; },
+    get lastExport() { return lastExport; },
+    get sculptMode() { return sculptMode; },
+    get slots() { return slots; },
+    palette: TERRAIN,
+    clientToWorld: clientToWorld,
+    worldToClient: worldToClient,
+    heightAt: function (x, y) { return hAt(Math.round(x), Math.round(y)); },
+    sampleTerrain: function (x, y) {
+      const ix = clamp(Math.round(x), 0, W - 1), iy = clamp(Math.round(y), 0, H - 1);
+      const d = tctx.getImageData(ix, iy, 1, 1).data;
+      return [d[0], d[1], d[2], d[3]];
+    },
+    findLand: findLand,
+    setTool: setTool,
+    setSea: setSea,
+    paintAt: function (x, y, name, radius) {
+      terrainName = TERRAIN[name] ? name : terrainName;
+      paintTerrainDisk(x, y, TERRAIN[terrainName].color, radius || brush);
+      dirty = true;
+    },
+    sculptAt: function (x, y, sign) {
+      sculptAt(x, y, sign >= 0 ? 1 : -1);
+      buildCoast();
+    },
+    placeStamp: function (type, x, y) {
+      const s = { id: uid(), type: type, x: x, y: y, size: 1, rot: stampRot, color: ink };
+      stamps.push(s);
+      dirty = true;
+      return s.id;
+    },
+    addRiver: function (points, w0, w1) {
+      const rv = { id: uid(), points: points, w0: w0 || 8, w1: w1 == null ? 1.4 : w1 };
+      rivers.push(rv); dirty = true; return rv;
+    },
+    addRoad: function (points, style) {
+      const rd = { id: uid(), points: points, style: style || 'solid' };
+      roads.push(rd); dirty = true; return rd;
+    },
+    addBorder: function (points, style) {
+      const bd = { id: uid(), points: points, style: style || 'dashed' };
+      borders.push(bd); dirty = true; return bd;
+    },
+    addLabel: function (text, x, y) {
+      const lab = { id: uid(), text: text, x: x, y: y, size: 15, curve: false, italic: false };
+      labels.push(lab); dirty = true; return lab;
+    },
+    setLabelText: function (id, text) {
+      const lab = labels.find(function (l) { return l.id === id; });
+      if (lab) { lab.text = text; dirty = true; }
+    },
+    setLabelCurve: function (id, on) {
+      const lab = labels.find(function (l) { return l.id === id; });
+      if (lab) { lab.curve = !!on; dirty = true; }
+    },
+    moveLabel: function (id, x, y) {
+      const lab = labels.find(function (l) { return l.id === id; });
+      if (lab) { lab.x = x; lab.y = y; dirty = true; }
+    },
+    removeLabel: function (id) {
+      const i = labels.findIndex(function (l) { return l.id === id; });
+      if (i >= 0) labels.splice(i, 1);
+      dirty = true;
+    },
+    moveStamp: function (id, x, y) {
+      const s = stamps.find(function (o) { return o.id === id; });
+      if (s) { s.x = x; s.y = y; dirty = true; }
+    },
+    deleteId: function (kind, id) {
+      selection = { kind: kind, id: id };
+      deleteSelection();
+    },
+    setFeature: function (id, on) {
+      if (!(id in features)) return;
+      features[id] = !!on;
+      if (sheetKind === 'features') renderFeatures();
+      updateUndoButtons();
+      dirty = true;
+    },
+    setLayer: function (id, on) { layers[id] = !!on; dirty = true; },
+    undo: undo,
+    redo: redo,
+    takeSnapshot: takeSnapshot,
+    exportPNG: exportPNG,
+    rebind: function (key, action) {
+      const slot = slotByKey(String(key).toLowerCase());
+      if (!slot || !ACTION_NAME[action]) return false;
+      slot.action = action;
+      renderHotbar();
+      return true;
+    },
+    slotAction: function (key) {
+      const slot = slotByKey(String(key).toLowerCase());
+      return slot ? slot.action : null;
+    },
+    generate: function (s, la, lo) { generate(s, la, lo); },
+    drawNow: function () { dirty = false; draw(); },
+    viewSignature: function () {
+      draw();
+      const d = vctx.getImageData(0, 0, view.width, view.height).data;
+      let hsh = 0;
+      for (let i = 0; i < d.length; i += 97) hsh = (Math.imul(hsh, 33) + d[i] + d[i + 1] + d[i + 2]) >>> 0;
+      return hsh;
+    },
+    mock: { version: MOCK_BAR_VERSION }
+  };
+
+  try {
+    buildPaper();
+    const start = parseHash();
+    generate(start.seed, start.lat, start.lon);
+    renderHotbar();
+    renderContext();
+    updateUndoButtons();
+    resize();
+    draw();
+    requestAnimationFrame(frame);
+    document.body.dataset.ready = '1';
+  } catch (err) {
+    const el = document.getElementById('boot-error');
+    el.hidden = false;
+    el.textContent = 'Landbox could not start: ' + (err && err.message ? err.message : err);
+    console.error(err);
+  }
+})();
+</script>
+</body>
+</html>

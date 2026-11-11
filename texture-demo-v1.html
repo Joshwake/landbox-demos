@@ -1,0 +1,994 @@
+<!-- Landbox texture look demo. Offline single file. Original procedural art. No network. -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data: blob:; connect-src 'none'; font-src 'none'; media-src 'none'">
+<title>Landbox texture look</title>
+<style>
+  :root {
+    --bg: #14110e; --surface: #221c16; --ink: #f3eadb; --muted: #b3a48e;
+    --line: #3c3228; --accent: #e0b15a; --chip: #2a241c;
+    --mock-rest: rgba(42, 36, 28, 0.3); --mock-solid: #2a241c; --tap: 44px;
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif; font-size: 15px;
+  }
+  body { padding-bottom: 96px; }
+  button, input { font: inherit; color: inherit; }
+  button { min-height: var(--tap); min-width: var(--tap); background: var(--chip); border: 1px solid #4a3d30; border-radius: 10px; padding: 6px 10px; }
+  button:focus-visible, a:focus-visible, input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  button[aria-pressed="true"] { border-color: var(--accent); background: #3a3124; }
+  .wrap { padding: 12px 12px 0; max-width: 1200px; margin: 0 auto; }
+  header h1 { font-family: Palatino, Georgia, serif; font-size: 26px; margin: 8px 0 4px; }
+  header p, .note { color: var(--muted); margin: 0 0 8px; line-height: 1.4; }
+  .controls { position: sticky; top: 0; z-index: 5; background: rgba(20,17,14,0.96); padding: 8px 0 6px; }
+  .slider { display: flex; align-items: center; gap: 8px; min-height: var(--tap); }
+  .slider span { width: 9.4rem; flex: none; }
+  .slider input[type="range"] { flex: 1; min-height: var(--tap); accent-color: var(--accent); }
+  .slider output { width: 42px; text-align: right; color: var(--accent); }
+  #parchment { width: 100%; margin-top: 4px; }
+  .jumps { display: flex; gap: 6px; overflow-x: auto; padding: 6px 0 8px; }
+  .jumps a {
+    flex: 0 0 auto; min-height: var(--tap); display: inline-flex; align-items: center;
+    padding: 0 12px; border-radius: 999px; border: 1px solid #4a3d30; color: var(--ink);
+    text-decoration: none; background: var(--chip);
+  }
+  article {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+    padding: 10px; margin: 0 0 12px;
+  }
+  article h2 { font-family: Palatino, Georgia, serif; font-size: 18px; margin: 0 0 4px; }
+  article p { margin: 0 0 8px; color: var(--muted); font-size: 13px; line-height: 1.35; }
+  canvas.look { width: 100%; height: auto; display: block; border-radius: 8px; background: #cbbfa6; }
+  #status { min-height: 1.2em; color: var(--accent); font-size: 13px; }
+  #boot-error { background: #3a1814; color: #ffd8d0; border: 1px solid #c4543a; border-radius: 10px; padding: 10px; }
+  #boot-error[hidden] { display: none; }
+  #mock-bar {
+    position: fixed; left: 8px; bottom: 8px; z-index: 80;
+    display: flex; flex-direction: column; align-items: flex-start; gap: 4px; max-width: calc(100vw - 16px);
+  }
+  .mock-version { margin: 0; font-size: 11px; line-height: 1.2; color: #f3eadb; opacity: 1; text-shadow: 0 1px 2px rgba(0,0,0,.65); }
+  .mock-row { display: flex; gap: 4px; align-items: center; position: relative; }
+  .mock-chip, .mock-swatch {
+    opacity: 1; color: #f3eadb; background: var(--mock-rest);
+    border: 1px solid rgba(243,234,219,0.55); border-radius: 10px;
+    min-height: var(--tap); min-width: var(--tap); padding: 0 10px;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .mock-chip:hover, .mock-chip:focus, .mock-chip:active,
+  .mock-swatch:hover, .mock-swatch:focus, .mock-swatch:active,
+  .mock-chip[aria-pressed="true"], .mock-swatch[aria-pressed="true"],
+  .mock-chip[aria-expanded="true"] { background: var(--mock-solid); }
+  .mock-swatch i { width: 16px; height: 16px; border-radius: 50%; display: block; opacity: 1; }
+  .mock-swatch[data-color="y"] i { background: #e2b100; }
+  .mock-swatch[data-color="g"] i { background: #2f9e44; }
+  .mock-swatch[data-color="r"] i { background: #e03131; }
+  #mock-dev-panel { position: absolute; bottom: calc(100% + 4px); left: 0; display: flex; flex-direction: column; gap: 4px; }
+  #mock-dev-panel[hidden] { display: none; }
+  #mark-layer { position: fixed; inset: 0; z-index: 70; pointer-events: none; }
+  #mark-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .mark-num {
+    position: absolute; transform: translate(-50%, -50%); min-width: 18px; height: 18px; padding: 0 4px;
+    border-radius: 9px; background: #14110e; color: #f3eadb; font-size: 11px; font-weight: 700;
+    display: flex; align-items: center; justify-content: center; opacity: 1; border: 1px solid currentColor; pointer-events: none;
+  }
+  #mark-layer.numbers-off .mark-num { visibility: hidden; }
+  #mark-layer.marks-off #mark-canvas, #mark-layer.marks-off .mark-num { visibility: hidden; }
+  body.mock-guides button, body.mock-guides a, body.mock-guides input { outline: 1px dashed #e0b15a !important; outline-offset: 1px; }
+  @media (min-width: 980px) {
+    .wrap { display: grid; grid-template-columns: 300px 1fr; gap: 16px; align-items: start; padding: 16px; }
+    .side { position: sticky; top: 0; }
+    .controls { position: static; }
+    .panels { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    article { margin: 0; }
+  }
+  @media (orientation: landscape) and (max-height: 520px) {
+    .controls { display: grid; grid-template-columns: 1fr 1fr; column-gap: 10px; }
+    #parchment { grid-column: 1 / -1; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="side">
+    <header>
+      <h1>Texture look</h1>
+      <p>The same sample island, five ways. Original procedural art, in the direction of inked pictorial maps and old RPG stamps. Nothing here is traced from Pauline Baynes, Inkarnate, Wonderdraft, or Dungeondraft.</p>
+    </header>
+    <div class="controls">
+      <label class="slider"><span>Emboss strength</span><input id="emboss" type="range" min="0" max="100" step="1" value="62"><output id="emboss-out">62</output></label>
+      <label class="slider"><span>Ink weight</span><input id="ink" type="range" min="0" max="100" step="1" value="48"><output id="ink-out">48</output></label>
+      <label class="slider"><span>Blend softness</span><input id="soft" type="range" min="0" max="100" step="1" value="28"><output id="soft-out">28</output></label>
+      <button type="button" id="parchment" aria-pressed="true">Parchment on</button>
+      <p id="status">Drawing the five looks…</p>
+    </div>
+    <nav class="jumps" aria-label="Looks">
+      <a href="#ink">Ink stamps</a>
+      <a href="#fills">Height blend</a>
+      <a href="#rpg">RPG stamps</a>
+      <a href="#combo">Combined</a>
+      <a href="#contour">Contours</a>
+    </nav>
+    <p class="note" id="boot-error" hidden></p>
+  </div>
+  <div class="panels">
+    <article id="ink">
+      <h2>Pictorial ink stamps</h2>
+      <p>Pen hills, mountains, and trees. Relief is lit from the stamp alpha, the way a bump map uses height without moving the surface.</p>
+      <canvas class="look" id="c-ink" width="420" height="280"></canvas>
+    </article>
+    <article id="fills">
+      <h2>Height-blended fills</h2>
+      <p>Grass, rock, mud, sand, and snow. Each tile keeps a micro-height in its alpha so the raised parts stay clean and the lower texture fills the gaps.</p>
+      <canvas class="look" id="c-height" width="420" height="280"></canvas>
+    </article>
+    <article id="rpg">
+      <h2>Old-school RPG stamps</h2>
+      <p>Flat realm colors and chunky symbols: triangle peaks, round woods, a keep and a town. A shadow stands in for emboss.</p>
+      <canvas class="look" id="c-rpg" width="420" height="280"></canvas>
+    </article>
+    <article id="combo">
+      <h2>Variant: ink on height-blend</h2>
+      <p>The two recommendations together. Height-blended ground, then the same pen stamps and their relief.</p>
+      <canvas class="look" id="c-combo" width="420" height="280"></canvas>
+    </article>
+    <article id="contour">
+      <h2>Variant: contour relief</h2>
+      <p>A draft chart. Contour lines follow the height, ink weight changes their spacing, and emboss lifts the strokes.</p>
+      <canvas class="look" id="c-contour" width="420" height="280"></canvas>
+    </article>
+  </div>
+</div>
+<div id="mock-bar" role="region" aria-label="Mock bar v2.2" data-version="Mock bar v2.2">
+  <p class="mock-version">Mock bar v2.2</p>
+  <div class="mock-row">
+    <button type="button" class="mock-swatch" data-color="y" aria-label="Yellow mark" aria-pressed="false"><i></i></button>
+    <button type="button" class="mock-swatch" data-color="g" aria-label="Green mark" aria-pressed="false"><i></i></button>
+    <button type="button" class="mock-swatch" data-color="r" aria-label="Red mark" aria-pressed="false"><i></i></button>
+    <button type="button" class="mock-chip" id="mock-numbers" aria-pressed="true" aria-label="Numbering">#</button>
+    <button type="button" class="mock-chip" id="mock-dev" aria-expanded="false" aria-label="Dev toggles">Dev</button>
+    <div id="mock-dev-panel" hidden>
+      <button type="button" class="mock-chip" id="mock-guides" aria-pressed="false">Guides</button>
+      <button type="button" class="mock-chip" id="mock-marks" aria-pressed="true">Marks</button>
+    </div>
+  </div>
+</div>
+<div id="mark-layer" aria-hidden="true"><canvas id="mark-canvas"></canvas></div>
+<script>
+(function () {
+  'use strict';
+  const TW = 420, TH = 280, SEA = 0.46, SEED = 1969;
+  const Hgt = new Float32Array(TW * TH);
+  const moist = new Float32Array(TW * TH);
+  const slopeA = new Float32Array(TW * TH);
+  let coastLines = [];
+  let anchors = [];
+  let paper, wash, poster;
+  const tiles = {};
+  let hbCache = { key: '', canvas: null };
+  let overlay, embossC;
+
+  function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
+  function hash2(ix, iy, s) {
+    let n = Math.imul(ix | 0, 374761393) + Math.imul(iy | 0, 668265263) + Math.imul(s | 0, 1442695041);
+    n = Math.imul(n ^ (n >>> 13), 1274126177);
+    return ((n ^ (n >>> 16)) >>> 0) / 4294967296;
+  }
+  function vnoise(x, y, s) {
+    const x0 = Math.floor(x), y0 = Math.floor(y);
+    const xf = x - x0, yf = y - y0;
+    const u = xf * xf * (3 - 2 * xf), v = yf * yf * (3 - 2 * yf);
+    const a = hash2(x0, y0, s), b = hash2(x0 + 1, y0, s);
+    const c = hash2(x0, y0 + 1, s), d = hash2(x0 + 1, y0 + 1, s);
+    return a * (1 - u) * (1 - v) + b * u * (1 - v) + c * (1 - u) * v + d * u * v;
+  }
+  function fbm(x, y, s, oct) {
+    let a = 0, f = 1, amp = 1, sum = 0;
+    for (let i = 0; i < oct; i++) {
+      a += amp * vnoise(x * f, y * f, (s + i * 101) | 0);
+      sum += amp; amp *= 0.5; f *= 2.05;
+    }
+    return a / sum;
+  }
+  function smoothstep(e0, e1, x) {
+    const t = clamp((x - e0) / (e1 - e0 || 1), 0, 1);
+    return t * t * (3 - 2 * t);
+  }
+  function hAt(x, y) {
+    if (x < 0) x = 0; else if (x >= TW) x = TW - 1;
+    if (y < 0) y = 0; else if (y >= TH) y = TH - 1;
+    return Hgt[y * TW + x];
+  }
+  function makeCanvas(w, h) {
+    const c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    return c;
+  }
+
+  function buildWorld() {
+    for (let y = 0; y < TH; y++) {
+      for (let x = 0; x < TW; x++) {
+        const nx = x / TW, ny = y / TH;
+        const d1 = Math.hypot((nx - 0.46) / 1.15, ny - 0.48);
+        const d2 = Math.hypot((nx - 0.62) / 1.05, ny - 0.58);
+        const mask = Math.max(1 - smoothstep(0.16, 0.42, d1), 1 - smoothstep(0.08, 0.24, d2));
+        const wx = fbm(x * 0.02, y * 0.02, SEED + 3, 3);
+        const wy = fbm(x * 0.02 + 3, y * 0.02, SEED + 9, 3);
+        const n = fbm(x * 0.012 + wx * 1.4, y * 0.012 + wy * 1.4, SEED, 5);
+        const rid = 1 - Math.abs(fbm(x * 0.02 + 2, y * 0.02, SEED + 21, 4) * 2 - 1);
+        let h = (n * 0.7 + rid * 0.3) * (0.25 + 0.75 * mask);
+        h = clamp(h * 0.98 + 0.03, 0, 1);
+        Hgt[y * TW + x] = h;
+        moist[y * TW + x] = fbm(x * 0.03 + 4, y * 0.03, SEED + 40, 4);
+      }
+    }
+    for (let y = 0; y < TH; y++) {
+      for (let x = 0; x < TW; x++) {
+        const h = Hgt[y * TW + x];
+        slopeA[y * TW + x] = Math.abs(h - hAt(x + 1, y)) + Math.abs(h - hAt(x, y + 1));
+      }
+    }
+    buildCoast();
+    buildAnchors();
+    paper = buildPaper();
+    wash = buildWash();
+    poster = buildPoster();
+    tiles.grass = buildTile('grass');
+    tiles.rock = buildTile('rock');
+    tiles.mud = buildTile('mud');
+    tiles.sand = buildTile('sand');
+    tiles.snow = buildTile('snow');
+    overlay = makeCanvas(TW, TH);
+    embossC = makeCanvas(TW, TH);
+  }
+
+  function buildCoast() {
+    const segs = [];
+    const level = SEA;
+    function lp(x0, y0, h0, x1, y1, h1) {
+      const den = h1 - h0;
+      const t = Math.abs(den) < 1e-6 ? 0.5 : clamp((level - h0) / den, 0, 1);
+      return { x: x0 + (x1 - x0) * t, y: y0 + (y1 - y0) * t };
+    }
+    const pairs = {
+      1: [[3, 0]], 2: [[0, 1]], 3: [[3, 1]], 4: [[1, 2]], 6: [[0, 2]], 7: [[3, 2]],
+      8: [[2, 3]], 9: [[0, 2]], 11: [[2, 1]], 12: [[1, 3]], 13: [[1, 0]], 14: [[0, 3]]
+    };
+    for (let y = 0; y < TH - 1; y++) {
+      for (let x = 0; x < TW - 1; x++) {
+        const h00 = Hgt[y * TW + x], h10 = Hgt[y * TW + x + 1];
+        const h11 = Hgt[(y + 1) * TW + x + 1], h01 = Hgt[(y + 1) * TW + x];
+        let code = (h00 >= level ? 1 : 0) | (h10 >= level ? 2 : 0) | (h11 >= level ? 4 : 0) | (h01 >= level ? 8 : 0);
+        if (code === 0 || code === 15) continue;
+        let list = pairs[code];
+        if (code === 5 || code === 10) {
+          const avg = (h00 + h10 + h11 + h01) / 4;
+          list = code === 5 ? (avg >= level ? [[3, 2], [0, 1]] : [[3, 0], [1, 2]]) : (avg >= level ? [[0, 3], [1, 2]] : [[0, 1], [2, 3]]);
+        }
+        if (!list) continue;
+        const edge = function (e) {
+          if (e === 0) return lp(x, y, h00, x + 1, y, h10);
+          if (e === 1) return lp(x + 1, y, h10, x + 1, y + 1, h11);
+          if (e === 2) return lp(x, y + 1, h01, x + 1, y + 1, h11);
+          return lp(x, y, h00, x, y + 1, h01);
+        };
+        for (let k = 0; k < list.length; k++) segs.push([edge(list[k][0]), edge(list[k][1])]);
+      }
+    }
+    coastLines = chain(segs);
+  }
+  function chain(segs) {
+    function key(p) { return Math.round(p.x * 2) + ',' + Math.round(p.y * 2); }
+    const adj = new Map();
+    function add(k, i, end) {
+      let list = adj.get(k);
+      if (!list) { list = []; adj.set(k, list); }
+      list.push({ i: i, end: end });
+    }
+    for (let i = 0; i < segs.length; i++) { add(key(segs[i][0]), i, 0); add(key(segs[i][1]), i, 1); }
+    const used = new Array(segs.length).fill(false);
+    const lines = [];
+    for (let i = 0; i < segs.length; i++) {
+      if (used[i]) continue;
+      used[i] = true;
+      const line = [segs[i][0], segs[i][1]];
+      let guard = 0;
+      while (guard++ < segs.length) {
+        const opts = (adj.get(key(line[line.length - 1])) || []).filter(function (o) { return !used[o.i]; });
+        if (!opts.length) break;
+        used[opts[0].i] = true;
+        const s = segs[opts[0].i];
+        line.push(opts[0].end === 0 ? s[1] : s[0]);
+      }
+      guard = 0;
+      while (guard++ < segs.length) {
+        const opts = (adj.get(key(line[0])) || []).filter(function (o) { return !used[o.i]; });
+        if (!opts.length) break;
+        used[opts[0].i] = true;
+        const s = segs[opts[0].i];
+        line.unshift(opts[0].end === 0 ? s[1] : s[0]);
+      }
+      if (line.length >= 2) lines.push(line);
+    }
+    return lines;
+  }
+
+  function buildAnchors() {
+    const peaks = [];
+    for (let y = 8; y < TH - 8; y += 5) {
+      for (let x = 8; x < TW - 8; x += 5) {
+        const h = Hgt[y * TW + x];
+        if (h < SEA + 0.16) continue;
+        let top = true;
+        for (let dy = -5; dy <= 5 && top; dy += 5) {
+          for (let dx = -5; dx <= 5; dx += 5) {
+            if (Hgt[(y + dy) * TW + (x + dx)] > h + 0.004) { top = false; break; }
+          }
+        }
+        if (top) peaks.push({ x: x, y: y, h: h });
+      }
+    }
+    peaks.sort(function (a, b) { return b.h - a.h; });
+    const used = [];
+    function far(x, y, min) {
+      for (let i = 0; i < used.length; i++) if (Math.hypot(used[i].x - x, used[i].y - y) < min) return false;
+      return true;
+    }
+    function add(type, x, y, scale) {
+      anchors.push({ type: type, x: x, y: y, scale: scale, rot: (hash2(x | 0, y | 0, 4) - 0.5) * 0.5 });
+      used.push({ x: x, y: y });
+    }
+    let n = 0;
+    for (let i = 0; i < peaks.length && n < 4; i++) {
+      if (n && !far(peaks[i].x, peaks[i].y, 28)) continue;
+      add('mountain', peaks[i].x, peaks[i].y, 1.15);
+      n++;
+    }
+    n = 0;
+    for (let i = 0; i < peaks.length && n < 3; i++) {
+      if (!far(peaks[i].x, peaks[i].y, 24)) continue;
+      add('hill', peaks[i].x, peaks[i].y, 1);
+      n++;
+    }
+    let trees = 0;
+    for (let y = 12; y < TH - 12 && trees < 8; y += 14) {
+      for (let x = 12; x < TW - 12 && trees < 8; x += 16) {
+        const h = Hgt[y * TW + x];
+        if (h > SEA + 0.06 && h < SEA + 0.28 && moist[y * TW + x] > 0.55 && far(x, y, 20)) {
+          add('trees', x, y, 0.85 + hash2(x, y, 8) * 0.4);
+          trees++;
+        }
+      }
+    }
+    const keep = peaks[0] || { x: TW * 0.48, y: TH * 0.46 };
+    add('castle', keep.x + 16, keep.y + 18, 1.05);
+    add('town', keep.x - 36, keep.y + 28, 1);
+    add('tower', keep.x + 34, keep.y + 6, 0.9);
+    anchors.labels = [
+      { text: 'Cinder Reach', x: keep.x + 8, y: keep.y + 36 },
+      { text: 'Senn Bay', x: 70, y: TH * 0.72 }
+    ];
+    for (let y = 20; y < TH - 20; y += 6) {
+      for (let x = 20; x < TW * 0.4; x += 6) {
+        if (Hgt[y * TW + x] < SEA - 0.04) { anchors.labels[1].x = x; anchors.labels[1].y = y; }
+      }
+    }
+  }
+
+  function buildPaper() {
+    const c = makeCanvas(TW, TH);
+    const ctx = c.getContext('2d');
+    const img = ctx.createImageData(TW, TH);
+    const d = img.data;
+    for (let y = 0; y < TH; y++) {
+      for (let x = 0; x < TW; x++) {
+        const n = hash2(x >> 1, y >> 1, 11);
+        const n2 = hash2(x >> 4, y >> 4, 19);
+        const fiber = (y % 6 === 0 && hash2(x >> 3, y, 3) > 0.75) ? -16 : 0;
+        const v = 214 + n * 28 + n2 * 8 + fiber;
+        const i = (y * TW + x) * 4;
+        d[i] = v; d[i + 1] = v * 0.94; d[i + 2] = v * 0.78; d[i + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    return c;
+  }
+  function buildWash() {
+    const c = makeCanvas(TW, TH);
+    const ctx = c.getContext('2d');
+    const img = ctx.createImageData(TW, TH);
+    const d = img.data;
+    for (let y = 0; y < TH; y++) {
+      for (let x = 0; x < TW; x++) {
+        const h = Hgt[y * TW + x];
+        const i = (y * TW + x) * 4;
+        if (h < SEA) {
+          const depth = clamp((SEA - h) / 0.2, 0, 1);
+          d[i] = 46 + (1 - depth) * 40; d[i + 1] = 96 + (1 - depth) * 30; d[i + 2] = 118; d[i + 3] = 210;
+        } else {
+          const elev = (h - SEA) / (1 - SEA);
+          d[i] = 168 - elev * 30; d[i + 1] = 156 - elev * 20; d[i + 2] = 96; d[i + 3] = 70;
+        }
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    return c;
+  }
+  function buildPoster() {
+    const c = makeCanvas(TW, TH);
+    const ctx = c.getContext('2d');
+    const img = ctx.createImageData(TW, TH);
+    const d = img.data;
+    for (let y = 0; y < TH; y++) {
+      for (let x = 0; x < TW; x++) {
+        const h = Hgt[y * TW + x];
+        const m = moist[y * TW + x];
+        const i = (y * TW + x) * 4;
+        let r, g, b;
+        if (h < SEA) { r = 48; g = 104; b = 168; }
+        else {
+          const elev = (h - SEA) / (1 - SEA);
+          if (elev > 0.78) { r = 236; g = 240; b = 244; }
+          else if (elev < 0.08) { r = 214; g = 196; b = 140; }
+          else if (m > 0.58 && elev < 0.62) { r = 31; g = 107; b = 58; }
+          else if (m < 0.38 && elev < 0.45) { r = 212; g = 176; b = 96; }
+          else { r = 96; g = 158; b = 72; }
+        }
+        d[i] = r; d[i + 1] = g; d[i + 2] = b; d[i + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    return c;
+  }
+  function buildTile(kind) {
+    const S = 64;
+    const data = new Uint8ClampedArray(S * S * 4);
+    for (let y = 0; y < S; y++) {
+      for (let x = 0; x < S; x++) {
+        const n = hash2(x, y, kind.length * 17);
+        const n2 = hash2(x >> 2, y >> 2, kind.length * 3);
+        let r, g, b, hv;
+        if (kind === 'grass') {
+          r = 86 + n * 30; g = 120 + n * 40; b = 52 + n * 10;
+          hv = 90 + n * 80 + (Math.sin(x * 0.7 + y) > 0.65 ? 50 : 0);
+        } else if (kind === 'rock') {
+          const crack = n > 0.86 || (Math.abs((x % 11) - 5) < 0.6 && n2 > 0.4);
+          r = crack ? 70 : 150 + n2 * 30; g = crack ? 68 : 146 + n2 * 24; b = crack ? 64 : 138 + n2 * 16;
+          hv = crack ? 30 : 160 + n * 70;
+        } else if (kind === 'mud') {
+          r = 112 + n2 * 40; g = 84 + n * 24; b = 48 + n * 16;
+          hv = 70 + n2 * 90;
+        } else if (kind === 'sand') {
+          r = 196 + n * 30; g = 176 + n * 24; b = 120 + n * 20;
+          hv = 100 + n2 * 100;
+        } else {
+          r = 230 + n * 20; g = 236 + n * 16; b = 242;
+          hv = 140 + n2 * 80;
+        }
+        const i = (y * S + x) * 4;
+        data[i] = r; data[i + 1] = g; data[i + 2] = b; data[i + 3] = hv;
+      }
+    }
+    return data;
+  }
+  function sampleTile(tile, x, y) {
+    const S = 64;
+    let tx = Math.floor(x) % S; if (tx < 0) tx += S;
+    let ty = Math.floor(y) % S; if (ty < 0) ty += S;
+    const i = (ty * S + tx) * 4;
+    return [tile[i], tile[i + 1], tile[i + 2], tile[i + 3] / 255];
+  }
+
+  function heightBlendCanvas(soft01) {
+    const key = soft01.toFixed(3);
+    if (hbCache.key === key && hbCache.canvas) return hbCache.canvas;
+    const c = hbCache.canvas || makeCanvas(TW, TH);
+    const ctx = c.getContext('2d', { willReadFrequently: true });
+    const img = ctx.createImageData(TW, TH);
+    const d = img.data;
+    const transition = 0.015 + soft01 * 0.5;
+    for (let y = 0; y < TH; y++) {
+      for (let x = 0; x < TW; x++) {
+        const h = Hgt[y * TW + x];
+        const i = (y * TW + x) * 4;
+        if (h < SEA) {
+          const depth = clamp((SEA - h) / 0.22, 0, 1);
+          d[i] = 36 + (1 - depth) * 50; d[i + 1] = 88 + (1 - depth) * 40; d[i + 2] = 120; d[i + 3] = 255;
+          continue;
+        }
+        const elev = (h - SEA) / (1 - SEA);
+        const m = moist[y * TW + x];
+        const sl = slopeA[y * TW + x];
+        const wts = {
+          sand: (1 - smoothstep(0.02, 0.16, elev)) * (1 - m * 0.25),
+          mud: m * (1 - smoothstep(0.04, 0.3, elev)) * 0.9,
+          grass: smoothstep(0.05, 0.2, elev) * (1 - smoothstep(0.55, 0.82, elev)) * (1 - Math.min(1, sl * 8)),
+          rock: Math.max(smoothstep(0.4, 0.68, elev), smoothstep(0.028, 0.075, sl)),
+          snow: smoothstep(0.6, 0.8, elev)
+        };
+        const names = ['sand', 'mud', 'grass', 'rock', 'snow'];
+        let maxS = 0;
+        const scored = [];
+        for (let k = 0; k < names.length; k++) {
+          const w = wts[names[k]];
+          if (w < 0.03) continue;
+          const tex = sampleTile(tiles[names[k]], x * 0.85, y * 0.85);
+          const score = w + tex[3] * 0.55;
+          if (score > maxS) maxS = score;
+          scored.push({ rgb: tex, score: score });
+        }
+        if (!scored.length) { d[i] = 120; d[i + 1] = 140; d[i + 2] = 80; d[i + 3] = 255; continue; }
+        const cut = maxS - transition;
+        let sum = 0, r = 0, g = 0, b = 0;
+        for (let k = 0; k < scored.length; k++) {
+          const v = Math.max(0, scored[k].score - cut);
+          sum += v; r += scored[k].rgb[0] * v; g += scored[k].rgb[1] * v; b += scored[k].rgb[2] * v;
+        }
+        if (sum <= 0.0001) {
+          d[i] = scored[0].rgb[0]; d[i + 1] = scored[0].rgb[1]; d[i + 2] = scored[0].rgb[2];
+        } else {
+          d[i] = r / sum; d[i + 1] = g / sum; d[i + 2] = b / sum;
+        }
+        d[i + 3] = 255;
+      }
+    }
+    ctx.putImageData(img, 0, 0);
+    hbCache = { key: key, canvas: c };
+    return c;
+  }
+
+  function background(ctx, parchment) {
+    if (parchment) ctx.drawImage(paper, 0, 0);
+    else { ctx.fillStyle = '#e6e0d2'; ctx.fillRect(0, 0, TW, TH); }
+  }
+  function multiplyPaper(ctx, alpha) {
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.globalAlpha = alpha;
+    ctx.drawImage(paper, 0, 0);
+    ctx.restore();
+  }
+  function strokeLines(ctx, lines, width, color, alpha) {
+    ctx.save();
+    ctx.strokeStyle = color;
+    ctx.globalAlpha = alpha == null ? 1 : alpha;
+    ctx.lineWidth = width;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      if (line.length < 2) continue;
+      ctx.beginPath();
+      ctx.moveTo(line[0].x, line[0].y);
+      for (let k = 1; k < line.length; k++) ctx.lineTo(line[k].x, line[k].y);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+  function drawCoast(ctx, weight, color) {
+    const w = 0.8 + weight * 2.2;
+    strokeLines(ctx, coastLines, w, color || '#2a2118', 1);
+    strokeLines(ctx, coastLines, Math.max(0.4, w * 0.45), color || '#2a2118', 0.35);
+  }
+  function drawSymbol(ctx, type, mode) {
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    if (mode === 'rpg') {
+      ctx.strokeStyle = '#1a140f';
+      if (type === 'mountain') {
+        ctx.fillStyle = '#8d8a84';
+        ctx.beginPath(); ctx.moveTo(-16, 12); ctx.lineTo(-2, -16); ctx.lineTo(4, -2); ctx.lineTo(16, -12); ctx.lineTo(18, 12); ctx.closePath(); ctx.fill(); ctx.stroke();
+        ctx.fillStyle = '#f7fbff';
+        ctx.beginPath(); ctx.moveTo(-6, -6); ctx.lineTo(-2, -16); ctx.lineTo(2, -5); ctx.closePath(); ctx.fill();
+      } else if (type === 'hill') {
+        ctx.fillStyle = '#6ea84a';
+        ctx.beginPath(); ctx.ellipse(0, 4, 16, 9, 0, Math.PI, 0); ctx.fill(); ctx.stroke();
+        ctx.beginPath(); ctx.ellipse(-6, 6, 8, 5, 0, Math.PI, 0); ctx.stroke();
+      } else if (type === 'trees') {
+        ctx.fillStyle = '#1d6b34';
+        [[-6, 2, 7], [6, 0, 8], [0, 7, 6]].forEach(function (b) { ctx.beginPath(); ctx.arc(b[0], b[1], b[2], 0, Math.PI * 2); ctx.fill(); ctx.stroke(); });
+        ctx.beginPath(); ctx.moveTo(-3, 8); ctx.lineTo(-3, 14); ctx.moveTo(5, 8); ctx.lineTo(5, 13); ctx.stroke();
+      } else if (type === 'castle') {
+        ctx.fillStyle = '#c4b49a';
+        ctx.fillRect(-14, -2, 28, 16); ctx.strokeRect(-14, -2, 28, 16);
+        ctx.fillRect(-16, -12, 8, 12); ctx.strokeRect(-16, -12, 8, 12);
+        ctx.fillRect(8, -12, 8, 12); ctx.strokeRect(8, -12, 8, 12);
+        ctx.fillStyle = '#8f2d2d';
+        ctx.beginPath(); ctx.moveTo(-16, -12); ctx.lineTo(-12, -18); ctx.lineTo(-8, -12); ctx.fill();
+        ctx.beginPath(); ctx.moveTo(8, -12); ctx.lineTo(12, -18); ctx.lineTo(16, -12); ctx.fill();
+      } else if (type === 'town') {
+        ctx.fillStyle = '#d8c7a4';
+        function house(x, y, w, hgt) {
+          ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - hgt); ctx.lineTo(x + w / 2, y - hgt - 7); ctx.lineTo(x + w, y - hgt); ctx.lineTo(x + w, y); ctx.closePath(); ctx.fill(); ctx.stroke();
+        }
+        house(-15, 10, 12, 10); house(-1, 8, 14, 12); house(14, 10, 8, 8);
+      } else if (type === 'tower') {
+        ctx.fillStyle = '#b7a48a';
+        ctx.beginPath(); ctx.moveTo(-6, 14); ctx.lineTo(-6, -6); ctx.lineTo(0, -16); ctx.lineTo(6, -6); ctx.lineTo(6, 14); ctx.closePath(); ctx.fill(); ctx.stroke();
+      }
+      return;
+    }
+    ctx.strokeStyle = '#3a2a1c';
+    ctx.fillStyle = '#3a2a1c';
+    if (type === 'mountain') {
+      ctx.beginPath(); ctx.moveTo(-18, 12); ctx.lineTo(-4, -16); ctx.lineTo(2, -3); ctx.lineTo(16, -13); ctx.lineTo(20, 12); ctx.stroke();
+      ctx.beginPath();
+      for (let i = 0; i < 5; i++) { ctx.moveTo(-12 + i * 3.2, 10); ctx.lineTo(-7 + i * 2.1, -1); }
+      ctx.moveTo(-8, -6); ctx.lineTo(-4, -16); ctx.lineTo(0, -5);
+      ctx.stroke();
+    } else if (type === 'hill') {
+      ctx.beginPath(); ctx.ellipse(-2, 5, 16, 8, 0, Math.PI, 0); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(-7, 7, 9, 5, 0, Math.PI, 0); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(8, 6, 6, 3.5, 0, Math.PI, 0); ctx.stroke();
+    } else if (type === 'trees') {
+      [[-7, 1, 7], [6, -1, 8], [0, 7, 5.5]].forEach(function (b) {
+        ctx.beginPath(); ctx.arc(b[0], b[1], b[2], 0, Math.PI * 2); ctx.stroke();
+        ctx.beginPath(); ctx.arc(b[0] - 1, b[1] - 1, b[2] * 0.45, 0.4, 2.2); ctx.stroke();
+      });
+      ctx.beginPath(); ctx.moveTo(-4, 8); ctx.lineTo(-4, 14); ctx.moveTo(5, 7); ctx.lineTo(5, 13); ctx.stroke();
+    } else if (type === 'castle') {
+      ctx.strokeRect(-14, -2, 28, 16);
+      ctx.strokeRect(-16, -14, 8, 14); ctx.strokeRect(8, -14, 8, 14);
+      ctx.beginPath();
+      ctx.moveTo(-16, -14); ctx.lineTo(-12, -18); ctx.lineTo(-8, -14);
+      ctx.moveTo(8, -14); ctx.lineTo(12, -18); ctx.lineTo(16, -14);
+      ctx.moveTo(-4, 14); ctx.lineTo(-4, 4); ctx.quadraticCurveTo(0, 2, 4, 4); ctx.lineTo(4, 14);
+      ctx.moveTo(-14, -2); ctx.lineTo(-14, -6); ctx.lineTo(-9, -6); ctx.lineTo(-9, -2);
+      ctx.stroke();
+    } else if (type === 'town') {
+      function roof(x, y, w, hgt) {
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - hgt); ctx.lineTo(x + w / 2, y - hgt - 6); ctx.lineTo(x + w, y - hgt); ctx.lineTo(x + w, y); ctx.stroke();
+      }
+      roof(-16, 10, 12, 9); roof(-2, 8, 13, 11); roof(12, 10, 8, 7);
+      ctx.beginPath(); ctx.moveTo(3, -3); ctx.lineTo(3, -13); ctx.moveTo(1, -10); ctx.lineTo(3, -13); ctx.lineTo(5, -10); ctx.stroke();
+    } else if (type === 'tower') {
+      ctx.beginPath(); ctx.moveTo(-6, 14); ctx.lineTo(-6, -8); ctx.lineTo(0, -18); ctx.lineTo(6, -8); ctx.lineTo(6, 14); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(-2, 14); ctx.lineTo(-2, 6); ctx.lineTo(2, 6); ctx.lineTo(2, 14); ctx.moveTo(0, -2); ctx.lineTo(0, -6); ctx.stroke();
+    }
+  }
+  function drawStamps(ctx, mode, weight, alphaOnly) {
+    const scaleInk = 0.85 + weight * 0.7;
+    anchors.forEach(function (s) {
+      ctx.save();
+      ctx.translate(s.x, s.y);
+      ctx.rotate(s.rot || 0);
+      ctx.scale(s.scale * scaleInk, s.scale * scaleInk);
+      ctx.lineWidth = (mode === 'rpg' ? 1.3 : 1.15) * (0.55 + weight * 1.5);
+      if (alphaOnly) { ctx.strokeStyle = '#000'; ctx.fillStyle = '#000'; }
+      drawSymbol(ctx, s.type, mode);
+      ctx.restore();
+    });
+  }
+  function drawNames(ctx, weight) {
+    ctx.save();
+    ctx.font = 'italic ' + Math.round(11 + weight * 6) + 'px Palatino, Georgia, serif';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = 'rgba(244,236,220,0.8)';
+    ctx.fillStyle = '#2a2118';
+    anchors.labels.forEach(function (lab) {
+      ctx.strokeText(lab.text, lab.x, lab.y);
+      ctx.fillText(lab.text, lab.x, lab.y);
+    });
+    ctx.restore();
+  }
+
+  function embossInto(source, strength) {
+    const sctx = source.getContext('2d', { willReadFrequently: true });
+    const img = sctx.getImageData(0, 0, TW, TH);
+    const src = img.data;
+    const octx = embossC.getContext('2d');
+    const out = octx.createImageData(TW, TH);
+    const o = out.data;
+    if (strength <= 0.001) { octx.clearRect(0, 0, TW, TH); return embossC; }
+    function A(x, y) {
+      if (x < 0) x = 0; else if (x >= TW) x = TW - 1;
+      if (y < 0) y = 0; else if (y >= TH) y = TH - 1;
+      return src[(y * TW + x) * 4 + 3];
+    }
+    const gain = strength * 0.85;
+    for (let y = 0; y < TH; y++) {
+      for (let x = 0; x < TW; x++) {
+        const gx = (A(x + 1, y - 1) + 2 * A(x + 1, y) + A(x + 1, y + 1)) - (A(x - 1, y - 1) + 2 * A(x - 1, y) + A(x - 1, y + 1));
+        const gy = (A(x - 1, y + 1) + 2 * A(x, y + 1) + A(x + 1, y + 1)) - (A(x - 1, y - 1) + 2 * A(x, y - 1) + A(x + 1, y - 1));
+        const mag = Math.abs(gx) + Math.abs(gy);
+        if (mag < 6 && A(x, y) < 8) continue;
+        const light = (-gx - gy) * gain;
+        const v = clamp(148 + light, 0, 255);
+        const a = Math.min(210, mag * gain * 1.4 + A(x, y) * strength * 0.25);
+        const i = (y * TW + x) * 4;
+        o[i] = o[i + 1] = o[i + 2] = v;
+        o[i + 3] = a;
+      }
+    }
+    octx.putImageData(out, 0, 0);
+    return embossC;
+  }
+
+  function paintOverlay(mode, weight) {
+    const ctx = overlay.getContext('2d');
+    ctx.clearRect(0, 0, TW, TH);
+    ctx.save();
+    ctx.lineWidth = 0.9 + weight * 2.4;
+    ctx.strokeStyle = '#000';
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    coastLines.forEach(function (line) {
+      if (line.length < 2) return;
+      ctx.beginPath();
+      ctx.moveTo(line[0].x, line[0].y);
+      for (let i = 1; i < line.length; i++) ctx.lineTo(line[i].x, line[i].y);
+      ctx.stroke();
+    });
+    ctx.restore();
+    drawStamps(ctx, mode, weight, true);
+    return overlay;
+  }
+
+  function readParams() {
+    const emboss = Number(document.getElementById('emboss').value) / 100;
+    const ink = Number(document.getElementById('ink').value) / 100;
+    const soft = Number(document.getElementById('soft').value) / 100;
+    const parchment = document.getElementById('parchment').getAttribute('aria-pressed') === 'true';
+    document.getElementById('emboss-out').textContent = String(Math.round(emboss * 100));
+    document.getElementById('ink-out').textContent = String(Math.round(ink * 100));
+    document.getElementById('soft-out').textContent = String(Math.round(soft * 100));
+    document.getElementById('parchment').textContent = parchment ? 'Parchment on' : 'Parchment off';
+    return { emboss: emboss, ink: ink, soft: soft, parchment: parchment };
+  }
+
+  function renderInk(p) {
+    const canvas = document.getElementById('c-ink');
+    const ctx = canvas.getContext('2d');
+    background(ctx, p.parchment);
+    ctx.drawImage(wash, 0, 0);
+    const layer = paintOverlay('ink', p.ink);
+    if (p.emboss > 0) ctx.drawImage(embossInto(layer, p.emboss), 0, 0);
+    ctx.save();
+    ctx.globalCompositeOperation = 'source-over';
+    drawCoast(ctx, p.ink, '#2c241c');
+    drawStamps(ctx, 'ink', p.ink, false);
+    drawNames(ctx, p.ink);
+    ctx.restore();
+  }
+  function renderHeight(p) {
+    const canvas = document.getElementById('c-height');
+    const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, TW, TH);
+    ctx.drawImage(heightBlendCanvas(p.soft), 0, 0);
+    if (p.parchment) multiplyPaper(ctx, 0.42);
+    drawCoast(ctx, 0.35 + p.ink * 0.4, '#243038');
+  }
+  function renderRpg(p) {
+    const canvas = document.getElementById('c-rpg');
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(poster, 0, 0);
+    if (p.parchment) multiplyPaper(ctx, 0.38);
+    const shift = Math.round(p.emboss * 5);
+    if (shift > 0) {
+      ctx.save();
+      ctx.translate(shift, shift);
+      ctx.globalAlpha = 0.28 + p.emboss * 0.25;
+      drawStamps(ctx, 'rpg', p.ink, true);
+      ctx.restore();
+    }
+    drawCoast(ctx, p.ink, '#16120e');
+    drawStamps(ctx, 'rpg', p.ink, false);
+    drawNames(ctx, p.ink);
+  }
+  function renderCombo(p) {
+    const canvas = document.getElementById('c-combo');
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(heightBlendCanvas(p.soft), 0, 0);
+    if (p.parchment) multiplyPaper(ctx, 0.4);
+    const layer = paintOverlay('ink', p.ink);
+    if (p.emboss > 0) ctx.drawImage(embossInto(layer, p.emboss), 0, 0);
+    drawCoast(ctx, p.ink, '#2c241c');
+    drawStamps(ctx, 'ink', p.ink, false);
+    drawNames(ctx, p.ink);
+  }
+  function renderContour(p) {
+    const canvas = document.getElementById('c-contour');
+    const ctx = canvas.getContext('2d');
+    background(ctx, p.parchment);
+    const step = Math.max(0.028, 0.09 - p.ink * 0.05);
+    const lctx = overlay.getContext('2d');
+    lctx.clearRect(0, 0, TW, TH);
+    const img = lctx.createImageData(TW, TH);
+    const d = img.data;
+    const mark = new Uint8Array(TW * TH);
+    for (let y = 1; y < TH - 1; y++) {
+      for (let x = 1; x < TW - 1; x++) {
+        const h = Hgt[y * TW + x];
+        if (h < SEA) continue;
+        const band = Math.floor(h / step);
+        if (band !== Math.floor(Hgt[y * TW + x + 1] / step) || band !== Math.floor(Hgt[(y + 1) * TW + x] / step)) mark[y * TW + x] = 1;
+      }
+    }
+    const rad = p.ink > 0.62 ? 1 : 0;
+    for (let y = 1; y < TH - 1; y++) {
+      for (let x = 1; x < TW - 1; x++) {
+        let on = mark[y * TW + x];
+        if (!on && rad) on = mark[y * TW + x - 1] || mark[y * TW + x + 1] || mark[(y - 1) * TW + x] || mark[(y + 1) * TW + x];
+        if (!on) continue;
+        const i = (y * TW + x) * 4;
+        d[i] = 42; d[i + 1] = 32; d[i + 2] = 22; d[i + 3] = 230;
+      }
+    }
+    lctx.putImageData(img, 0, 0);
+    if (p.emboss > 0) ctx.drawImage(embossInto(overlay, p.emboss * 0.85), 0, 0);
+    ctx.drawImage(overlay, 0, 0);
+    drawCoast(ctx, 0.35 + p.ink * 0.8, '#1c2430');
+  }
+
+  let raf = 0;
+  function render() {
+    const p = readParams();
+    renderInk(p);
+    renderHeight(p);
+    renderRpg(p);
+    renderCombo(p);
+    renderContour(p);
+    document.getElementById('status').textContent = 'Same coast, peaks, and woods in every panel.';
+    return p;
+  }
+  function schedule() {
+    if (raf) return;
+    raf = requestAnimationFrame(function () { raf = 0; render(); });
+  }
+
+  ['emboss', 'ink', 'soft'].forEach(function (id) {
+    document.getElementById(id).addEventListener('input', schedule);
+  });
+  document.getElementById('parchment').addEventListener('click', function () {
+    const on = this.getAttribute('aria-pressed') === 'true';
+    this.setAttribute('aria-pressed', on ? 'false' : 'true');
+    schedule();
+  });
+
+  const MOCK_BAR_VERSION = 'Mock bar v2.2';
+  const MOCK_CHIP_BG_ALPHA = 0.3;
+  const theme = { bg: { base: '#2a241c' } };
+  function mockBgAlpha(css, a) {
+    const m = /^#([0-9a-f]{6})$/i.exec(css || '');
+    if (!m) return 'rgba(128,128,128,' + a + ')';
+    const n = parseInt(m[1], 16);
+    return 'rgba(' + ((n >> 16) & 255) + ',' + ((n >> 8) & 255) + ',' + (n & 255) + ',' + a + ')';
+  }
+  document.documentElement.style.setProperty('--mock-rest', mockBgAlpha(theme.bg.base, MOCK_CHIP_BG_ALPHA));
+  document.documentElement.style.setProperty('--mock-solid', theme.bg.base);
+  (function installMarks() {
+    const HL = { y: '#e2b100', g: '#2f9e44', r: '#e03131' };
+    const markLayer = document.getElementById('mark-layer');
+    const markCanvas = document.getElementById('mark-canvas');
+    const mctx = markCanvas.getContext('2d');
+    const swatches = Array.from(document.querySelectorAll('.mock-swatch'));
+    let hlColor = null;
+    const marks = [];
+    let drawing = null;
+    function syncHl() {
+      swatches.forEach(function (s) { s.setAttribute('aria-pressed', s.dataset.color === hlColor ? 'true' : 'false'); });
+      markLayer.style.pointerEvents = hlColor == null ? 'none' : 'auto';
+      markLayer.classList.toggle('is-live', hlColor != null);
+    }
+    function sizeMark() {
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      markCanvas.width = Math.round(window.innerWidth * dpr);
+      markCanvas.height = Math.round(window.innerHeight * dpr);
+      paintMarks();
+    }
+    function paintMarks() {
+      const dpr = markCanvas.width / Math.max(1, window.innerWidth);
+      mctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      mctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+      const all = drawing ? marks.concat([drawing]) : marks;
+      markLayer.querySelectorAll('.mark-num').forEach(function (n) { n.remove(); });
+      all.forEach(function (mark) {
+        mctx.strokeStyle = HL[mark.color];
+        mctx.fillStyle = HL[mark.color];
+        mctx.lineWidth = 3;
+        mctx.lineJoin = 'round';
+        mctx.lineCap = 'round';
+        if (mark.pts.length < 2) {
+          mctx.beginPath(); mctx.arc(mark.pts[0].x, mark.pts[0].y, 8, 0, Math.PI * 2); mctx.fill();
+        } else {
+          mctx.beginPath(); mctx.moveTo(mark.pts[0].x, mark.pts[0].y);
+          for (let i = 1; i < mark.pts.length; i++) mctx.lineTo(mark.pts[i].x, mark.pts[i].y);
+          mctx.stroke();
+        }
+        const badge = document.createElement('span');
+        badge.className = 'mark-num';
+        badge.textContent = String(mark.n);
+        badge.style.left = mark.pts[0].x + 'px';
+        badge.style.top = mark.pts[0].y + 'px';
+        badge.style.color = HL[mark.color];
+        markLayer.appendChild(badge);
+      });
+    }
+    swatches.forEach(function (s) {
+      s.addEventListener('click', function () {
+        hlColor = hlColor === s.dataset.color ? null : s.dataset.color;
+        syncHl();
+      });
+    });
+    document.getElementById('mock-numbers').addEventListener('click', function () {
+      const off = markLayer.classList.toggle('numbers-off');
+      this.setAttribute('aria-pressed', off ? 'false' : 'true');
+    });
+    document.getElementById('mock-dev').addEventListener('click', function () {
+      const panel = document.getElementById('mock-dev-panel');
+      panel.hidden = !panel.hidden;
+      this.setAttribute('aria-expanded', panel.hidden ? 'false' : 'true');
+    });
+    document.getElementById('mock-guides').addEventListener('click', function () {
+      const on = document.body.classList.toggle('mock-guides');
+      this.setAttribute('aria-pressed', on ? 'true' : 'false');
+    });
+    document.getElementById('mock-marks').addEventListener('click', function () {
+      const hidden = markLayer.classList.toggle('marks-off');
+      this.setAttribute('aria-pressed', hidden ? 'false' : 'true');
+    });
+    markLayer.addEventListener('pointerdown', function (e) {
+      if (hlColor == null) return;
+      markLayer.setPointerCapture(e.pointerId);
+      drawing = { color: hlColor, pts: [{ x: e.clientX, y: e.clientY }], n: marks.length + 1 };
+      paintMarks();
+    });
+    markLayer.addEventListener('pointermove', function (e) {
+      if (!drawing) return;
+      drawing.pts.push({ x: e.clientX, y: e.clientY });
+      paintMarks();
+    });
+    function finishMark() {
+      if (!drawing) return;
+      marks.push(drawing);
+      drawing = null;
+      paintMarks();
+    }
+    markLayer.addEventListener('pointerup', finishMark);
+    markLayer.addEventListener('pointercancel', finishMark);
+    window.addEventListener('resize', sizeMark);
+    sizeMark();
+    syncHl();
+    document.getElementById('mock-bar').dataset.version = MOCK_BAR_VERSION;
+  })();
+
+  function signature(canvas) {
+    const ctx = canvas.getContext('2d');
+    const d = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+    let h = 0;
+    for (let i = 0; i < d.length; i += 80) h = (Math.imul(h, 33) + d[i] + d[i + 1] + d[i + 2]) >>> 0;
+    return h;
+  }
+
+  try {
+    const t0 = performance.now();
+    buildWorld();
+    render();
+    const ms = Math.round(performance.now() - t0);
+    document.getElementById('status').textContent = 'Same coast, peaks, and woods in every panel. Drew in ' + ms + ' ms.';
+    window.TEX = {
+      version: 'landbox-texture-demo-tolkien-v1',
+      render: render,
+      signature: function (id) { return signature(document.getElementById(id)); },
+      params: readParams,
+      anchors: anchors.length,
+      coast: coastLines.length
+    };
+    document.body.dataset.ready = '1';
+  } catch (err) {
+    const el = document.getElementById('boot-error');
+    el.hidden = false;
+    el.textContent = 'Texture demo could not start: ' + (err && err.message ? err.message : err);
+    console.error(err);
+  }
+})();
+</script>
+</body>
+</html>
