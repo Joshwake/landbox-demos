@@ -119,6 +119,7 @@ body.panR-open #pmold-group{right:146px}
 .sh-head{display:flex;align-items:center;gap:8px;padding:4px 6px 4px 12px;border-bottom:1px solid var(--line)}
 .sh-head b{flex:1;font:600 14px Palatino,"Palatino Linotype",Georgia,serif;color:var(--acc)}
 #shBody{overflow:auto;padding:4px 12px 16px;flex:1}
+#sheet.portrait #shBody{padding-bottom:56px} /* fix: last rows scroll clear of the Mock bar button (bottom-left, z 20) */
 #shBody h5{margin:10px 0 3px;font:600 12.5px Palatino,"Palatino Linotype",Georgia,serif;color:var(--acc)}
 #shBody .desc{color:var(--muted);font-size:11px;line-height:1.3;margin:2px 0 4px}
 .pr{display:grid;grid-template-columns:minmax(92px,40%) 1fr 58px;align-items:center;gap:6px;min-height:36px;font-size:11.5px}
@@ -963,8 +964,11 @@ function hudAt(p) {
   document.addEventListener('pointerdown', (e) => { const b = e.target.closest && e.target.closest('button'); down = (e.pointerType !== 'mouse' && ours(b)) ? { b, x: e.clientX, y: e.clientY, id: e.pointerId } : null; }, true);
   document.addEventListener('pointerup', (e) => { if (!down || e.pointerId !== down.id) return; const d = down; down = null;
     if (Math.hypot(e.clientX - d.x, e.clientY - d.y) > 12 || d.b.disabled || d.b.closest('.vtrack')) return;
-    swallow = { b: d.b, t: performance.now() }; d.b.click(); }, true);
-  document.addEventListener('click', (e) => { const tb = e.target.closest && e.target.closest('button'); if (e.isTrusted && swallow && performance.now() - swallow.t < 700 && tb && (tb === swallow.b || !swallow.b.isConnected)) { e.stopImmediatePropagation(); e.preventDefault(); swallow = null; } }, true);
+    swallow = { b: d.b, t: performance.now(), x: e.clientX, y: e.clientY }; d.b.click(); }, true);
+  // swallow the browser's own click for that same tap, whatever is under it now. Before, only a click on the same (or a detached)
+  // button was swallowed, so when the tap closed something (sheet ✕, gear) the native click fell through to what lay beneath:
+  // sheet ✕ at 390x844 sits over the Intensity tab, so closing the sheet silently opened the Intensity panel (DBuggy #2).
+  document.addEventListener('click', (e) => { if (e.isTrusted && swallow && performance.now() - swallow.t < 700 && Math.hypot(e.clientX - swallow.x, e.clientY - swallow.y) < 24) { e.stopImmediatePropagation(); e.preventDefault(); swallow = null; } }, true);
 })();
 
 /* ---------- UI: tools + brush row ---------- */
@@ -984,6 +988,7 @@ const covList = () => [...COVERS, { name: 'Bare', c: BARE }];
 const covCss = (k) => k === null || k === undefined ? 'transparent' : k === WATER ? 'rgb(52,104,132)' : `rgb(${covList()[k].c.join(',')})`;
 const covName = (k) => k === null || k === undefined ? '—' : k === WATER ? 'Water' : covList()[k].name;
 function armBind(which) { st.bindArm = st.bindArm === which ? null : which; syncDir();
+  if (openTag === 'sw') placePanel($('#chipSw')); // fix: re-place when arming/disarming with Swatches already open (was left at its old spot)
   if (st.bindArm) { if (openTag !== 'sw') toggleTag($('#chipSw')); toast((which === 'up' ? '▲ raise' : '▼ lower') + ': now tap a swatch'); } }
 $('#mold-up').onclick = () => armBind('up');
 $('#mold-down').onclick = () => armBind('down');
@@ -1216,7 +1221,24 @@ function wireTag(k) {
 }
 // open chip panel: stays above the sea strip, never covers either side tab, the tool column, Back/Undo/Redo or Paint+Mold;
 // avoids the other chips (so they stay tappable) and open side panels when there is room
+// Swatches opened from ▲/▼ (bind armed): pin it just above the ▲ chip, 8px clear of the tool column (Mocky's layout).
+// Returns false when it does not fit there (e.g. landscape), so the general placement runs instead.
+function pinSwatches(chip) {
+  const gap = 6, toolGap = 8, R = (q) => { const e = $(q); if (!e || getComputedStyle(e).display === 'none') return null; const b = e.getBoundingClientRect(); return b.width ? b : null; };
+  const up = R('#mold-up'), tools = R('#tools'), tl = R('#tabL'), tr = R('#tabR'), own = chip.getBoundingClientRect(); if (!up) return false;
+  const bot = up.top - toolGap, vo = (b, y0) => b && y0 < b.bottom + 2 && bot > b.top - 2;
+  let right = cw - 8; if (vo(tools, 8)) right = Math.min(right, tools.left - toolGap); if (vo(tr, 8)) right = Math.min(right, tr.left - gap);
+  let left = 8; if (vo(tl, 8)) left = Math.max(left, tl.right + gap);
+  const w = Math.min(320, right - left); if (w < 200) return false;
+  const top = own.left < right && own.right > left ? own.bottom + gap : 8; if (bot - top < 160) return false;
+  tp.style.display = 'block'; tp.style.maxWidth = w + 'px'; tp.style.maxHeight = (bot - top) + 'px';
+  const pw = tp.offsetWidth, ph = tp.offsetHeight, x = right - pw, y = bot - ph;
+  const hard = ['#tabL', '#tabR', '#tl', '#tools', '#pmold-group', '#brushes'].map(R).filter(Boolean).concat([own]);
+  if (hard.some((b) => x < b.right && x + pw > b.left && y < b.bottom && y + ph > b.top)) return false;
+  tp.style.left = x + 'px'; tp.style.top = y + 'px'; return true;
+}
 function placePanel(chip) {
+  if (chip && chip.id === 'chipSw' && st.bindArm && pinSwatches(chip)) return;
   const gap = 6;
   const tl = $('#tabL').getBoundingClientRect(), tr = $('#tabR').getBoundingClientRect();
   const maxBot = bottomLimit() - gap;
@@ -1257,6 +1279,11 @@ function placePanel(chip) {
     const up = r.top - gap - 8, dn = maxBot - (r.bottom + gap);
     ph = Math.max(80, Math.min(ph, Math.max(up, dn))); tp.style.maxHeight = ph + 'px';
     best = { x: clamp(tl.right + gap, laneL, laneR - pw), y: up >= dn ? Math.max(8, r.top - gap - ph) : r.bottom + gap };
+    // fix (DBuggy 390, Swatches over Elevation/Erase): this fallback used to ignore the hard zones. Narrow the panel so its right
+    // edge stops short of any hard zone (tool column, ▲/▼ group, right tab) that shares its band, then re-measure.
+    const band = (b) => best.y < b.bottom + 2 && best.y + tp.offsetHeight > b.top - 2;
+    const lim = hard.filter((b) => b !== r && band(b) && b.right > best.x + 2).reduce((m, b) => Math.min(m, b.left - gap - 2), laneR);
+    if (best.x + pw > lim) { tp.style.maxWidth = Math.max(140, lim - best.x) + 'px'; }
   }
   tp.style.left = best.x + 'px'; tp.style.top = best.y + 'px';
 }
