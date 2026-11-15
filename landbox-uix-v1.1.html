@@ -342,7 +342,7 @@ function sizeSliders() {
   // V1.1: off sideways, the side sliders end above the brush row + the tray's band, so the full-width row and tray never sit on them (min 90 px track)
   if (!V.side) { const tw = sizeOf(byG.tool), rowT = defPos('tool', tw.w, tw.h).t, lim = rowT - 6 - byG.tray.offsetHeight - 6; let n = trH;
     for (const [g, nm] of [[byG.brush, 'brush'], [byG.intensity, 'intensity']]) { if (L[nm]) continue; const z = sizeOf(g), bot = defPos(nm, z.w, z.h).t + z.h; if (bot > lim) n = Math.min(n, trH - (bot - lim)); }
-    n = Math.max(90, Math.round(n)); if (n !== trH) { $('#brushTr').style.height = n + 'px'; $('#intTr').style.height = n + 'px'; } }
+    n = Math.max(60, Math.round(n)); if (n !== trH) { $('#brushTr').style.height = n + 'px'; $('#intTr').style.height = n + 'px'; } }
 }
 
 // name tags never collide: a tag that lands on another (or off screen) slides sideways, then down/up, to the nearest free spot
